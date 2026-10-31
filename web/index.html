@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Election Lens</title>
+  <meta name="description" content="US presidential election results from 2000 to 2024, from the Electoral College down to every county.">
+  <script>
+    // apply a saved light/dark choice before the page paints
+    try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <link rel="preload" href="vendor/public-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-row">
+      <a class="wordmark" href="./">Election Lens</a>
+      <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode"></button>
+    </div>
+    <h1>How America voted, <span class="nowrap">2000 to 2024</span></h1>
+    <p class="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
+  </header>
+
+  <nav class="years" aria-label="Election year">
+    <ol id="year-list"></ol>
+  </nav>
+
+  <main class="stage">
+    <section class="map-wrap" aria-label="Map">
+      <div class="map-tools">
+        <div class="mode" role="radiogroup" aria-label="Map shows">
+          <button type="button" role="radio" aria-checked="true" data-mode="margin">Winner and margin</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="shift">Shift since previous election</button>
+        </div>
+        <div class="mode" role="radiogroup" aria-label="Color the map by">
+          <button type="button" role="radio" aria-checked="true" data-level="states">States</button>
+          <button type="button" role="radio" aria-checked="false" data-level="counties">Counties</button>
+        </div>
+        <button type="button" id="reset" class="quiet" hidden>Show whole country</button>
+      </div>
+      <svg id="map" role="img" aria-label="Map of US counties colored by result"></svg>
+      <div id="legend" class="legend"></div>
+      <div id="tip" class="tip" hidden></div>
+    </section>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </main>
+
+  <footer class="colophon">
+    <p>Sources: 2000–2016 official county returns from the <a href="https://github.com/MEDSL/county-returns">MIT Election Data and Science Lab</a>; 2020–2024 county results compiled by <a href="https://github.com/tonmcg/US_County_Level_Election_Results_08-24">Tony McGovern</a>. Alaska is shown statewide. Connecticut reports 2024 results by planning region.</p>
+    <p>Election Lens is open source under the AGPL-3.0 license.</p>
+  </footer>
+
+  <script src="vendor/d3.min.js"></script>
+  <script src="vendor/topojson-client.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
