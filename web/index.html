@@ -30,9 +30,13 @@
     <section class="map-wrap" aria-label="Map">
       <div class="map-tools">
         <div class="mode" role="radiogroup" aria-label="Map shows">
-          <button type="button" role="radio" aria-checked="true" data-mode="margin">Winner and margin</button>
-          <button type="button" role="radio" aria-checked="false" data-mode="shift">Shift since previous election</button>
+          <button type="button" role="radio" aria-checked="true" data-mode="margin" title="Who won and by how much">Margin</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="shift" title="How far the margin moved since the previous election">Shift</button>
         </div>
+        <button type="button" id="arrows" class="chip" aria-pressed="false" title="Show the shift as arrows" hidden>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12L12 5M7.5 4.5L12 5L11.4 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Arrows
+        </button>
         <div class="mode" role="radiogroup" aria-label="Color the map by">
           <button type="button" role="radio" aria-checked="true" data-level="states">States</button>
           <button type="button" role="radio" aria-checked="false" data-level="counties">Counties</button>

@@ -17,7 +17,7 @@ uv run python -m http.server 8000
 
 Then open http://localhost:8000. (Opening `index.html` directly from disk does not work, because the browser blocks loading the data files.)
 
-The page opens on the map colored by state, with the national result in electoral votes. Links can point at a year, view and place, for example `#year=2024&view=shift&map=counties&place=48201` (Harris County, Texas, shift since 2020). Other options: `map=counties` colors the map by county, and `vote=popular` shows the national popular vote.
+The page opens on the map colored by state, with the national result in electoral votes. Links can point at a year, view and place, for example `#year=2024&view=shift&map=counties&place=48201` (Harris County, Texas, shift since 2020). Other options: `map=counties` colors the map by county, `vote=popular` shows the national popular vote, and `arrows=on` draws shift arrows in the Shift view.
 
 ## Rebuild the data
 
@@ -57,7 +57,7 @@ Candidate portraits: put original photos in `photos/` (not committed) and run `u
 Each dataset keeps its original license and terms; see the source for details.
 
 Known gaps:
-- Alaska reports by state house district, so it is shown as one statewide area. Alaska 2004 and 2020 are left out because the source totals are unreliable.
+- Alaska reports by state house district, so it is shown as one statewide area. For 2004, 2020 and 2024 the district data is unreliable, so Alaska uses its certified statewide totals (US House Clerk, National Archives certificates of ascertainment).
 - Connecticut reported 2024 results by its new planning regions, so 2024 is mapped by region and earlier years by the old eight counties.
 - Florida 2000: the county figures predate certification and put Gore 202 votes ahead; the statewide total uses the certified result (Bush by 537).
 - Kansas City, Missouri, reports apart from its counties; for 2000–2016 it is counted in Jackson County.

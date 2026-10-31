@@ -19,8 +19,9 @@ Output shape (votes are [democratic, republican, total]):
 
 Known gaps, kept visible on the map rather than filled in:
   - Alaska reports by state house district, so it is shown as one statewide shape.
-    Alaska 2004 is left out: MEDSL notes its district returns overstate the votes cast.
-    Alaska 2020 is left out: several district totals in the source are inflated.
+    For 2004, 2020 and 2024 the district data is unreliable (MEDSL notes the 2004 district
+    returns overstate the votes cast; the compiled 2020 and 2024 totals are off), so
+    Alaska uses its certified statewide totals for those years (STATE_OVERRIDES).
   - Connecticut reports 2024 results by planning region (new county equivalents);
     earlier years use the old eight counties.
   - Florida 2000: the MEDSL county figures predate certification (they put Gore ahead by
@@ -81,11 +82,20 @@ PEOPLE = {
     "Trump": "Donald Trump", "Biden": "Joe Biden", "Harris": "Kamala Harris",
 }
 
-# Certified statewide totals that replace the sum of county figures, as [dem, gop, total]
+# Certified statewide totals that replace the sum of county figures, as [dem, gop, total].
+# Each was checked against two sources.
 STATE_OVERRIDES = {
-    # Florida Secretary of State, certified 26 Nov 2000
+    # Florida Secretary of State, certified 26 Nov 2000 (also Wikipedia)
     (2000, "12"): [2912253, 2912790, 5963110],
+    # Alaska: US House Clerk 2004 statistics and Wikipedia
+    (2004, "02"): [111025, 190889, 312598],
+    # Alaska: certificate of ascertainment (National Archives) and Wikipedia (incl. 1,961 write-ins)
+    (2020, "02"): [153778, 189951, 359530],
+    # Alaska: certificate of ascertainment (National Archives) and Wikipedia (no write-ins allowed)
+    (2024, "02"): [140026, 184458, 338177],
 }
+# States shown as a single area: their one "county" takes the statewide override too
+SINGLE_UNIT = {"02": "02000"}
 
 # Electoral votes: House seats per state after each census (US Census Bureau), + 2 senators.
 # DC has 3. Elections use the apportionment of the census before them.
@@ -126,8 +136,6 @@ DISTRICT_WINNERS = {
     },
 }
 
-# Statewide winner where the county data has no usable total (Alaska 2004 and 2020)
-EV_WINNER_OVERRIDES = {2004: {"02": "gop"}, 2020: {"02": "gop"}}
 # Electoral votes won from state results ("as called on election night"), used as a check
 EV_WON = {2000: [267, 271], 2004: [252, 286], 2008: [365, 173], 2012: [332, 206],
           2016: [232, 306], 2020: [306, 232], 2024: [226, 312]}
@@ -152,10 +160,8 @@ def electoral(states):
             if st in EV_SPLITS.get(year, {}):
                 d, r = EV_SPLITS[year][st]
             else:
-                w = EV_WINNER_OVERRIDES.get(year, {}).get(st)
-                if not w:
-                    v = states[st]["r"][str(year)]
-                    w = "dem" if v[0] > v[1] else "gop"
+                v = states[st]["r"][str(year)]
+                w = "dem" if v[0] > v[1] else "gop"
                 d, r = (n, 0) if w == "dem" else (0, n)
             by_state[st] = [d, r]
             won[0] += d
@@ -250,6 +256,10 @@ def main():
 
     names["02000"] = "Alaska"
     names["11001"] = "District of Columbia"
+
+    for (year, st), v in STATE_OVERRIDES.items():
+        if st in SINGLE_UNIT:
+            votes[SINGLE_UNIT[st]][year] = list(v)
 
     states = {}
     nation = {}

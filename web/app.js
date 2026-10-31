@@ -24,7 +24,7 @@
 
   // ---------- state ----------
   // mode: margin | shift   level: counties | states   vote: popular | ec (national panel)
-  const state = { year: 2024, mode: "margin", level: "states", vote: "ec", sel: { type: "nation" } };
+  const state = { year: 2024, mode: "margin", level: "states", vote: "ec", arrows: false, sel: { type: "nation" } };
   readHash();
 
   // ---------- helpers ----------
@@ -151,9 +151,14 @@
   const selPath = g.append("path").attr("class", "selected");
   // badges inside Maine and Nebraska with the electoral votes the second candidate won there
   const gBadges = g.append("g").attr("class", "ev-badges");
+  // shift arrows: drawn in map coordinates, then scaled by 1/zoom so they keep their screen size
+  const gArrows = g.append("g").attr("class", "arrows");
 
   const zoom = d3.zoom().scaleExtent([1, 32]).translateExtent([[0, 0], [W, H]])
-    .on("zoom", e => g.attr("transform", e.transform));
+    .on("zoom", e => {
+      g.attr("transform", e.transform);
+      gArrows.style("--inv", 1 / e.transform.k);
+    });
   svg.call(zoom).on("dblclick.zoom", null);
 
   // fill = share of the map the shape should take up (a county gets less, so its neighbors stay visible)
@@ -191,13 +196,58 @@
     drawSelection();
     drawLegend();
     drawBadges();
+    drawArrows();
+  }
+
+  // One arrow per area: left and up = toward Democrats, right and up = toward Republicans,
+  // longer = bigger shift. Shown in Shift view when the Arrows toggle is on.
+  const centroids = new Map();
+  const centroidOf = f => {
+    const key = f.properties.id ?? "st" + f.properties.st;
+    if (!centroids.has(key)) centroids.set(key, path.centroid(f));
+    return centroids.get(key);
+  };
+  function drawArrows() {
+    const on = state.mode === "shift" && state.arrows;
+    gArrows.style("display", on ? null : "none");
+    d3.select("#map").classed("arrows-on", on).classed("by-states", state.level === "states");
+    if (!on) { gArrows.selectAll("*").remove(); return; }
+    const y = String(state.year), st = stateOf(state.sel), open = st && !SINGLE.has(st);
+    // arrows follow what the map colors: states, or the counties of the opened state
+    let items;
+    if (state.level === "states" && !open) items = states.map(f => ({ f, v: shift({ type: "state", id: f.properties.st }, y) }));
+    else items = visibleShapes(state.year)
+      .filter(f => !st || f.properties.st === st)
+      .map(f => ({ f, v: shift({ type: "county", id: f.properties.id }, y) }));
+    items = items.filter(d => d.v != null && Math.abs(d.v) >= 0.001);
+    // states get longer arrows; thousands of county arrows need to be shorter to stay readable
+    const bigArrows = state.level === "states" && !open;
+    const perPoint = bigArrows ? 2.2 : 1.2, maxLen = bigArrows ? 40 : 22;
+    const len = v => Math.min(maxLen, Math.abs(v) * 100 * perPoint);
+    gArrows.classed("fine", !bigArrows);
+    gArrows.selectAll("g.arrow").data(items, d => d.f.properties.id ?? d.f.properties.st)
+      .join(enter => {
+        const a = enter.append("g").attr("class", "arrow");
+        a.append("path");
+        return a;
+      })
+      .attr("transform", d => { const [x, yy] = centroidOf(d.f); return `translate(${x},${yy})`; })
+      .select("path")
+      .attr("stroke", d => (d.v > 0 ? colors.demSolid : colors.gopSolid))
+      .attr("d", d => {
+        const L = len(d.v), dir = d.v > 0 ? -1 : 1; // Democrats left, Republicans right
+        const dx = dir * L * 0.82, dy = -L * 0.57;           // about 35 degrees above level
+        const ux = dx / L, uy = dy / L, h = Math.min(5, 2 + L * 0.15); // arrowhead
+        const bx = dx - ux * h, by = dy - uy * h, px = -uy * h * 0.6, py = ux * h * 0.6;
+        return `M0,0L${dx},${dy}M${bx + px},${by + py}L${dx},${dy}L${bx - px},${by - py}`;
+      });
   }
 
   // Maine and Nebraska split their electoral votes by district: in split years a badge inside
   // the state shows how many the second candidate won, in that candidate's color
   function drawBadges() {
     const y = String(state.year);
-    const show = state.vote === "ec" && state.level === "states" && state.sel.type === "nation";
+    const show = categorical() && state.sel.type === "nation";
     const splits = show
       ? Object.entries(ec(y).states).filter(([, [d, r]]) => d && r).map(([st, [d, r]]) => {
           const minor = d < r ? "dem" : "gop";
@@ -252,14 +302,21 @@
     let body;
     if (!v) body = "No results for this year";
     else if (state.mode === "shift") {
-      const s = shift(target, y);
-      body = s == null ? "No earlier result to compare" : `Moved ${Math.abs(s * 100).toFixed(1)} pts toward ${s >= 0 ? "Democrats" : "Republicans"} since ${prevYear(state.year)}`;
+      const s = shift(target, y), p = prevYear(state.year);
+      if (s == null) body = `<span class="tip-note">No ${p ?? "earlier"} result to compare</span>`;
+      else {
+        const before = margin(record(target, String(p))), now = margin(v);
+        const side = s >= 0 ? "d" : "r";
+        body = `<span class="tip-shift mg ${side}">${s >= 0 ? "D" : "R"} +${Math.abs(s * 100).toFixed(1)}</span>
+          <span class="tip-note">${p} <span class="mg ${before >= 0 ? "d" : "r"}">${mlabel(before)}</span> → ${state.year} <span class="mg ${now >= 0 ? "d" : "r"}">${mlabel(now)}</span></span>`;
+      }
     } else {
       const w = wonBy(target, y, v);
       const mark = p => (w === p ? `<span class="won">${CHECK}<span class="sr">winner</span></span>` : "");
       const row = (who, p, votes) => {
-        const b = w === p ? " is-winner" : "";
-        return `<span class="tip-name${b}">${who}${mark(p)}</span><span class="tip-pct${b}">${pct(votes / v[2])}</span>`;
+        const b = w === p ? " is-winner" : "", share = votes / v[2];
+        return `<span class="tip-name${b}">${who}${mark(p)}</span><span class="tip-pct${b}">${pct(share)}</span>
+          <span class="tip-bar"><span style="width:${share * 100}%;background:${colors[p + "Solid"]}"></span></span>`;
       };
       const rows = { dem: row(c.dem + " (D)", "dem", v[0]), gop: row(c.gop + " (R)", "gop", v[1]) };
       body = `<span class="tip-rows">${byCount(v[0], v[1]).map(p => rows[p]).join("")}</span><span class="mg ${v[0] >= v[1] ? "d" : "r"}">${mlabel(margin(v))}</span>`;
@@ -303,8 +360,13 @@
     const note = state.mode === "margin"
       ? `Steps at ${b.map(x => x * 100).join(", ")} points`
       : prevYear(state.year) ? `Change in margin since ${prevYear(state.year)}; steps at ${b.map(x => x * 100).join(", ")} points` : "No earlier election to compare with 2000";
+    // Shift view reads like the arrows: Democrats on the left, Republicans on the right
+    const ramp = state.mode === "shift"
+      ? swatch([...colors.dem].reverse()) + swatch(colors.gop)
+      : swatch([...colors.gop].reverse()) + swatch(colors.dem);
+    const [left, right] = state.mode === "shift" ? [ends[1], ends[0]] : ends;
     document.getElementById("legend").innerHTML =
-      `<span>${ends[0]}</span><span class="ramp">${swatch([...colors.gop].reverse())}${swatch(colors.dem)}</span><span>${ends[1]}</span><span>${note}</span>`;
+      `<span>${left}</span><span class="ramp">${ramp}</span><span>${right}</span><span>${note}</span>`;
   }
 
   // ---------- year ribbon ----------
@@ -442,7 +504,6 @@
 
   function noDataReason(s, y) {
     const id = s.id || "";
-    if (id === "02000") return "Alaska's results for this year are left out because the source totals are unreliable.";
     if (id.startsWith("09") && y === 2024) return "Connecticut reported 2024 results by planning region, not county.";
     if (id.startsWith("091") && y < 2024) return "Connecticut's planning regions only report results from 2024.";
     if (id === "08014" && y === 2000) return "Broomfield County was created in 2001.";
@@ -585,6 +646,7 @@
     drawSelection();
     drawLegend();
     drawBadges();
+    drawArrows();
     drawPanel();
     writeHash();
   }
@@ -595,10 +657,19 @@
     drawPanel();
     writeHash();
   }
+  const arrowsBtn = document.getElementById("arrows");
   function syncToggles() {
     document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
     document.querySelectorAll("[data-level]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.level === state.level)));
+    arrowsBtn.hidden = state.mode !== "shift";
+    arrowsBtn.setAttribute("aria-pressed", String(state.arrows));
   }
+  arrowsBtn.addEventListener("click", () => {
+    state.arrows = !state.arrows;
+    syncToggles();
+    drawArrows();
+    writeHash();
+  });
   function setMode(m) {
     state.mode = m;
     syncToggles();
@@ -667,6 +738,7 @@
     if (state.mode !== "margin") p.set("view", state.mode);
     if (state.level !== "states") p.set("map", state.level);
     if (state.vote !== "ec") p.set("vote", state.vote);
+    if (state.arrows) p.set("arrows", "on");
     if (state.sel.type !== "nation") p.set("place", state.sel.id);
     history.replaceState(null, "", "#" + p.toString());
   }
@@ -676,6 +748,7 @@
     if (h.includes("=")) {
       const p = new URLSearchParams(h);
       [y, m, id, lv, vt] = [p.get("year"), p.get("view"), p.get("place"), p.get("map"), p.get("vote")];
+      state.arrows = p.get("arrows") === "on";
     } else {
       [y, m, id] = h.split("/"); // older links: #2024/margin/48201
     }

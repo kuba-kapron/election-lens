@@ -290,6 +290,22 @@ h1 {
 .combo li[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--ink); }
 .combo li.none { color: var(--muted); cursor: default; }
 
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.chip svg { width: 14px; height: 14px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip[hidden] { display: none; }
+
 .quiet {
   background: none;
   border: 0;
@@ -309,6 +325,14 @@ h1 {
 #map .county { stroke: var(--county-line); stroke-width: 0.35; vector-effect: non-scaling-stroke; cursor: pointer; }
 #map .county.dim, #map .state-fill.dim { opacity: 0.28; }
 #map .state-fill { stroke: none; cursor: pointer; }
+#map .arrows { pointer-events: none; }
+#map .arrow path { fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9;
+  transform: scale(var(--inv, 1)); vector-effect: non-scaling-stroke; }
+#map .arrows.fine path { stroke-width: 1.1; }
+/* with arrows on, the shaded map steps back so the arrows read clearly */
+#map.arrows-on .county, #map.arrows-on .state-fill { fill-opacity: 0.35; }
+/* in the States view the faded states must not let the counties underneath show through */
+#map.arrows-on.by-states .county:not(.pickable) { visibility: hidden; }
 #map .ev-badge { pointer-events: none; }
 #map .ev-badge circle { stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 #map .ev-badge text { fill: #ffffff; font-family: inherit; font-size: 11px; font-weight: 700; }
@@ -348,6 +372,11 @@ h1 {
 .tip strong { display: block; font-size: 14px; }
 .tip .tip-rows { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; row-gap: 2px; margin: 4px 0; }
 .tip .tip-pct { text-align: right; }
+.tip .tip-bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--nodata); overflow: hidden; margin: 2px 0 4px; }
+.tip .tip-bar span { display: block; height: 100%; }
+.tip .tip-shift { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; margin-top: 2px; }
+.tip .tip-note { display: block; font-size: 12px; color: var(--muted); }
+.tip .tip-note .mg { display: inline; }
 .tip .is-winner { font-weight: 700; }
 .tip .mg { display: block; }
 .tip .flip { display: block; margin-top: 4px; font-weight: 600; font-size: 12px; }
