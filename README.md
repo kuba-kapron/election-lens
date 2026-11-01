@@ -51,7 +51,7 @@ Both builds compare every race's leading candidates across sources and stop on a
 
 Candidate portraits: put original photos in `photos/` (not committed) and run `uv run pipeline/build_photos.py`. See `web/img/candidates/README.md` for file names.
 
-Party icons: put them in `photos/parties/` named by party code (`D.svg`, `R.webp`; also `L`, `G`, `I`) and run the same script. A party without an icon shows its letter, as in "(D)".
+Party icons: put them in `photos/parties/` named by party code (`D.svg`, `R.svg`; also `L`, `G`, `I`; SVG preferred) and run the same script. A party without an icon shows its letter, as in "(D)".
 
 ## Scope
 
