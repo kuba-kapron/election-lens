@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Election Lens</title>
-  <meta name="description" content="US presidential election results from 2000 to 2024, from the Electoral College down to every county.">
+  <meta name="description" content="US presidential results from 2000 to 2024 and Senate and House results from 2020 to 2024, from the national result down to every county and district.">
   <script>
     // apply a saved light/dark choice before the page paints
     try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
@@ -18,11 +18,16 @@
       <a class="wordmark" href="./">Election Lens</a>
       <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode"></button>
     </div>
-    <h1>How America voted, <span class="nowrap">2000 to 2024</span></h1>
-    <p class="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
+    <h1 id="headline">How America voted, <span class="nowrap">2000 to 2024</span></h1>
+    <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
   </header>
 
   <nav class="years" aria-label="Election year">
+    <div class="mode office" role="radiogroup" aria-label="Office">
+      <button type="button" role="radio" aria-checked="true" data-office="president">President</button>
+      <button type="button" role="radio" aria-checked="false" data-office="senate">Senate</button>
+      <button type="button" role="radio" aria-checked="false" data-office="house">House</button>
+    </div>
     <ol id="year-list"></ol>
   </nav>
 
@@ -37,7 +42,7 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12L12 5M7.5 4.5L12 5L11.4 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Arrows
         </button>
-        <div class="mode" role="radiogroup" aria-label="Color the map by">
+        <div class="mode" role="radiogroup" aria-label="Color the map by" id="level-toggle">
           <button type="button" role="radio" aria-checked="true" data-level="states">States</button>
           <button type="button" role="radio" aria-checked="false" data-level="counties">Counties</button>
         </div>
@@ -52,7 +57,9 @@
   </main>
 
   <footer class="colophon">
-    <p>Sources: 2000–2016 official county returns from the <a href="https://github.com/MEDSL/county-returns">MIT Election Data and Science Lab</a>; 2020–2024 county results compiled by <a href="https://github.com/tonmcg/US_County_Level_Election_Results_08-24">Tony McGovern</a>. Alaska is shown statewide. Connecticut reports 2024 results by planning region.</p>
+    <p>President: 2000–2016 official county returns from the <a href="https://github.com/MEDSL/county-returns">MIT Election Data and Science Lab</a>; 2020–2024 county results compiled by <a href="https://github.com/tonmcg/US_County_Level_Election_Results_08-24">Tony McGovern</a>. Alaska is shown statewide. Connecticut reports 2024 presidential results by planning region.</p>
+    <p>Senate and House: certified results from the <a href="https://www.fec.gov/introduction-campaign-finance/election-results-and-voting-information/">Federal Election Commission</a> (2020, 2022) and the <a href="https://clerk.house.gov/Members/ElectionInformation">Clerk of the House</a> (2024), checked against each other; Senate county figures from the <a href="https://electionlab.mit.edu/data">MIT Election Data and Science Lab</a> precinct returns; district maps from the US Census Bureau and the North Carolina General Assembly.</p>
+    <p>Party icons from Wikimedia Commons: Democratic and Republican public domain; <a href="https://commons.wikimedia.org/wiki/File:Libertarian_Disc.svg">Libertarian</a> by Hdebug (original by Lance W. Haverkamp) and <a href="https://commons.wikimedia.org/wiki/File:Green_Disc.svg">Green</a> by Gappalachia, both <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>, resized.</p>
     <p>Election Lens is open source under the AGPL-3.0 license.</p>
   </footer>
 

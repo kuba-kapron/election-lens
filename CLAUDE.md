@@ -29,7 +29,14 @@ US presidential results 2000–2024 on one static page (`web/`):
 pipeline/fetch_data.sh       raw sources -> data/raw/ (gitignored)
 pipeline/build_geo.sh        county shapes -> web/data/geo.json (needs mapshaper)
 pipeline/build_results.py    results + electoral votes -> web/data/results.json (stdlib only)
-pipeline/build_photos.py     photos/ originals -> web/img/candidates/*.jpg + photos.json (Pillow)
+pipeline/build_photos.py     photos/ originals -> web/img/candidates/*.jpg + photos.json;
+                             photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
+pipeline/fetch_congress.sh   FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
+pipeline/fetch_portraits.py  official portraits of candidates who served -> photos/congress/
+pipeline/build_house_geo.sh  district shapes -> web/data/house/<year>.json (mapshaper)
+pipeline/build_senate.py     -> web/data/senate.json (statewide, counties, seat history)
+pipeline/build_house.py      -> web/data/house.json (435 districts per year)
+pipeline/congress.py, xlsx.py  shared readers: FEC spreadsheets, Clerk PDF text (pypdf)
 web/index.html, app.js, style.css   the page; plain JS + D3 v7, no build step
 web/vendor/                  D3, topojson-client, Public Sans (vendored, licenses in README there)
 photos/                      original candidate photos (gitignored)
@@ -62,6 +69,34 @@ Safari caches aggressively: reload with Cmd+Option+R after changes.
 - Segmented controls share one style; the theme toggle is one button with a sliding thumb.
 - Plain, short UI labels; longer explanations go in `title` hover text or the legend.
 - Check changes in a browser at desktop and phone widths, in light and dark mode.
+
+## Senate and House results 2020–2024
+
+Built 31 October 2026 (office switch President | Senate | House on the page, `#race=senate`).
+Official figures: FEC (2020, 2022) and Clerk of the House (2024); each build cross-checks
+sources and asserts seats, Senate control and flips against documented totals.
+Decided with the owner:
+
+- Sources: MEDSL (Harvard Dataverse) statewide Senate 1976–2024, House by district
+  1976–2024, Senate precinct returns 2020/2022/2024 summed to counties. Cross-check against
+  the FEC's official "Federal Elections 2020/2022" compilations. MEDSL's simplified party
+  labels have errors (Lummis WY 2020, Duckworth IL 2022, Van Hollen MD 2022 come out as
+  "other"); work from the detailed party and verify.
+- Margin only for Senate and House. No Shift view yet: the same Senate seat is up every
+  6 years and House districts were redrawn for 2022 (and some for 2024). Revisit later by
+  looking at what TV networks do.
+- Runoffs and ranked-choice: the deciding round (Georgia runoffs, final RCV round) colors
+  the map and decides the winner; the panel also shows the first round. Where the final
+  round exists only statewide/district-wide, counties show the first round, labeled.
+- Independents are colored by caucus: King and Sanders in Democratic blue (noted as
+  independents who caucus with Democrats); Osborn and McMullin in purple (`--ind`, also used
+  for other small parties). Greens are green and Libertarians gold, matching their icons.
+- Members of Congress are matched to their Congress (bioguide) ID with the
+  congress-legislators list (`congress.member()`): FEC ID first, checked against the name
+  (the FEC reuses IDs). The ID gives the official portrait, one first name per person across
+  years (the shorter form: "Nick", not "Nicholas") and the incumbent flag, taken from term
+  dates because the FEC's mark is wrong in about 25 places (special-election winners, all of
+  Arizona and Nebraska in 2024, open seats in Delaware and Oregon 2024).
 
 ## Next: live results, US midterms, 3 November 2026
 
