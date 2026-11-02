@@ -119,5 +119,12 @@ Plan agreed so far (not yet built):
 Open question: local only, or a public link (GitHub Pages / Cloudflare Pages plus a way to
 publish updates every few minutes)?
 
-Later: certified 2026 results, House/Senate history, Alaska by house district, Poland
+Next after election night: governor results 2020, 2022, 2024 (the owner wants them; decided
+2 November 2026 to build the live page first). Even years only for now (2021/2023 odd-year
+races later). Sources: MEDSL "State Precinct-Level Returns" per state (2022 and 2024 open,
+CC0; 2020 behind the Dataverse guestbook, so the owner downloads it), each race checked against
+its state's certified statewide result (no FEC-style national source for governors). The
+per-state files total about 2 GB: ask before downloading.
+
+Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland
 (PKW results down to gmina, live for the 2027 parliamentary election), more countries.
