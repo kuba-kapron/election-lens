@@ -166,6 +166,56 @@ def build(race, reading, src, errors, manual, calls, senate):
     return out
 
 
+def not_up(senate):
+    """The 65 Senate seats not up in 2026, and who holds each now.
+
+    Class 1 seats were elected in 2024 and class 3 seats in 2022 (our certified results),
+    except Florida's and Ohio's class 3 seats, which are up again tonight in special elections.
+    A seat can change hands without an election (death or resignation and an appointment, a
+    party switch, a vacancy), so each is checked against the legislator list's current members:
+    where they differ, the current holder counts and the seat carries a note. Nothing stops.
+    """
+    by_fips = {f: a for a, f in S.ABBR_TO_FIPS.items()}
+    current = {}
+    for f in ("legislators-current.json",):
+        for p in json.loads((C.RAW / f).read_text()):
+            t = p["terms"][-1]
+            if t["type"] == "sen" and t.get("class") in (1, 3) and t["end"] >= "2026-11-03":
+                side = (t.get("caucus") or t.get("party") or "")[:1]
+                current[(t["state"], t["class"])] = {"party": side if side in ("D", "R") else "I",
+                                                     "name": p["name"].get("official_full") or p["name"]["last"]}
+    seats = []
+    for year, cls in (("2024", 1), ("2022", 3)):
+        for r in senate["races"][year]:
+            st = by_fips[r["st"]]
+            if r["cls"] != cls or (year == "2022" and st in ("FL", "OH")):
+                continue
+            # California 2022 and 2024: a short special and the full term for the same seat
+            if r["seat"] == "special" and any(x["st"] == r["st"] and x["cls"] == cls and x["seat"] == "regular"
+                                              for x in senate["races"][year]):
+                continue
+            w = r["cands"][0]
+            seat = {"st": r["st"], "cls": cls, "year": int(year), "seat": r["seat"], "elected": w["name"],
+                    "elected_party": w["caucus"], "party": w["caucus"], "name": w["name"]}
+            now = current.get((st, cls))
+            if not now:
+                seat.update(party=None, name=None, note=f"Vacant now; won in {year} by {w['name']}.")
+            elif now["party"] != w["caucus"] or LR.last_name(w["name"]) not in now["name"]:
+                seat.update(party=now["party"], name=now["name"],
+                            note=f"Won in {year} by {w['name']} ({w['caucus']}); now held by {now['name']} ({now['party']}).")
+            seats.append(seat)
+    changed = [x["note"] for x in seats if x.get("note")]
+    print(f"Senate seats not up: {len(seats)}; changed since their election: {len(changed)}"
+          + "".join(f"\n   {n}" for n in changed), flush=True)
+    before = {"D": 0, "R": 0, "I": 0}
+    for p in json.loads((C.RAW / "legislators-current.json").read_text()):
+        t = p["terms"][-1]
+        if t["type"] == "sen" and t["end"] >= "2026-11-03":
+            side = (t.get("caucus") or t.get("party") or "")[:1]
+            before[side if side in ("D", "R") else "I"] += 1
+    return {"seats": seats, "before": before}
+
+
 PARTY = {"Democratic": "D", "Republican": "R", "Libertarian": "L", "Green": "G", "Independent": "I"}
 
 
@@ -231,9 +281,10 @@ def house(args, started, history, plans):
     return out
 
 
-def write(races, house_races):
+def write(races, house_races, senate_not_up):
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    data = {"updated": iso(time.time()), "year": 2026, "races": races, "house": house_races}
+    data = {"updated": iso(time.time()), "year": 2026, "races": races, "house": house_races,
+            "senate_not_up": senate_not_up}
     tmp = OUT.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
     os.replace(tmp, OUT)  # the page never sees a half-written file
@@ -249,6 +300,7 @@ def main():
     senate = json.loads((ROOT / "web/data/senate.json").read_text())
     history = json.loads((ROOT / "web/data/house.json").read_text())["races"]
     plans = json.loads((ROOT / "web/data/house/plans.json").read_text())
+    held = not_up(senate)
     started = time.time()
     while True:
         manual, calls = load(MANUAL), load(CALLS)
@@ -261,7 +313,7 @@ def main():
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"
             print(f"{time.strftime('%H:%M:%S')} {race['id']:7} {(r.get('source') or {}).get('kind') or 'none':9} {pct:>4}  {lead}"
                   + (f"   [{'; '.join(errors)}]" if errors else ""), flush=True)
-        write(races, {} if args.replay else house(args, started, history, plans))
+        write(races, {} if args.replay else house(args, started, history, plans), held)
         if args.once:
             return 0
         time.sleep(args.every)

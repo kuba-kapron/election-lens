@@ -147,6 +147,14 @@ Rules agreed with the owner:
   owner approves are fetched (`fetch_commons_photos.py`) and credited in the footer (author,
   license with link). Wikimedia's APIs (/w/, /api/) are closed to scripts by robots.txt and
   its search and image servers rate-limit scripts: go slowly (one request every few seconds).
+- Senate balance on the 2026 Senate panel: the 65 seats not up (class 1, filled in 2024; class 3,
+  filled in 2022, minus the FL/OH specials) are counted by who holds them now, from the
+  legislator list (the source for current membership). Each seat is matched to its race in our
+  certified results; where the holder differs from the race's winner (appointment, party
+  switch, vacancy, or an error in either source) the seat gets a note for a person to check,
+  and nothing stops.
+  Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
+  (Vice President Vance breaks ties).
 - House (added 3 November): all 435 races from one civicAPI request per round (its race search,
   type "House of Representatives"), written to live.json "house" keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435

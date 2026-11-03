@@ -20,7 +20,8 @@
   async function loadLive() {
     let d = null;
     try { d = await d3.json(`data/live.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
-    extra.live = { races: { [LIVE_YEAR]: d ? d.races : [] }, house: d?.house || {}, updated: d ? d.updated : null };
+    extra.live = { races: { [LIVE_YEAR]: d ? d.races : [] }, house: d?.house || {}, notUp: d?.senate_not_up || null,
+      updated: d ? d.updated : null };
   }
   async function ensureData(office, year) {
     if (+year === LIVE_YEAR) {
@@ -1199,6 +1200,38 @@
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], -1)}</div>
       <p class="summary">${r.cands[l.lead].name} leads the county ${byText(l)}.${cp != null ? ` ${Math.round(cp)}% ${r.pct_of && r.pct_of.startsWith("precincts") ? "of precincts reporting" : "counted"}.` : ""} ${fmtInt(v[n + 1])} votes counted.</p>${liveSource(r)}`;
   }
+  // Senate balance tonight: seats not up (won in 2022/2024, current holder) + called + leading
+  function senateBalance() {
+    const b = { D: { notUp: 0, called: 0, leading: 0 }, R: { notUp: 0, called: 0, leading: 0 }, I: { notUp: 0, called: 0, leading: 0 }, pending: 0 };
+    for (const x of extra.live.notUp?.seats || []) if (x.party) b[x.party].notUp++;
+    for (const r of liveRaces().filter(r => r.office === "senate")) {
+      if (r.call && r.call.winner != null) b[r.cands[r.call.winner].caucus].called++;
+      else if (counted(r)) b[raceLean(r).caucus].leading++;
+      else b.pending++;
+    }
+    return b;
+  }
+  function senateBalanceBody() {
+    if (!extra.live.notUp) return "";
+    const b = senateBalance();
+    const tot = p => b[p].notUp + b[p].called + b[p].leading;
+    const order = (tot("R") > tot("D") ? ["R", "D"] : ["D", "R"]).concat(tot("I") ? ["I"] : []);
+    const row = p => {
+      const solid = colors[ckey(p) + "Solid"], light = colors[ckey(p)][1], x = b[p], need = p === "R" ? 50 : p === "D" ? 51 : null;
+      const seg = (n, c, t) => (n ? `<span style="width:${n}%;background:${c}" title="${t}: ${n}"></span>` : "");
+      // independents who caucus with neither party (e.g. Dan Osborn) get their own row
+      return `<div class="cand-row">${partyAvatar(p, solid)}<div class="cand-main"><span class="name">${CAUCUS_NAME[p]}</span><span class="pct">${tot(p)}</span>
+        <div class="bar ev-bar stacked" style="--need:${(need || 0) / 100}">${seg(x.notUp + x.called, solid, "Not up or called")}${seg(x.leading, light, "Leading")}${need ? `<i class="need" title="${need} for control"></i>` : ""}</div>
+        <span class="votes">${x.notUp} not up · ${x.called} won · ${x.leading} leading</span></div></div>`;
+    };
+    const before = extra.live.notUp.before;
+    const changed = (extra.live.notUp.seats || []).filter(x => x.note);
+    return `<div class="cand">${order.map(row).join("")}</div>
+      <p class="summary">${b.pending ? `${b.pending} of 35 races have no votes counted yet. ` : ""}Before tonight: Republicans ${before.R}, Democrats ${before.D}${before.I ? `, others ${before.I}` : ""}.</p>
+      <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties. Light bars are leads in the votes counted so far, not wins; a race counts as won only once a news organization has called it.</li>
+      <li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
+      <h3>Races tonight</h3>`;
+  }
   function liveNationBody() {
     const rs = [...sYear()].sort((a, b) => Date.parse(a.polls_close) - Date.parse(b.polls_close) || data.states[a.st].name.localeCompare(data.states[b.st].name));
     if (!rs.length) return `<p class="empty">No results file yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
@@ -1210,7 +1243,7 @@
         <span class="who">${who}${l && !(r.call && r.call.winner != null) ? ` <span class="muted">· ${pctText(r).replace(/ of .*| counted/, "")}</span>` : ""}</span>${l ? leanLabel(l) : ""}</button></li>`;
     });
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}<p class="summary">${extra.live.updated ? `Updated ${clock(extra.live.updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
+    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${extra.live.updated ? `Updated ${clock(extra.live.updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
       <ul class="race-list">${items.join("")}</ul>`;
   }
   // footer: name the official sources the live results come from right now

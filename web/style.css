@@ -576,3 +576,8 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .test-flag { margin: 0 0 12px; padding: 6px 10px; border-radius: 6px; font-weight: 700; font-size: 13px;
   background: var(--focus); color: #15202b; display: inline-block; }
 .muted { color: var(--muted); font-weight: 400; }
+/* Senate balance: seats not up or won, then leads, as one bar */
+.ev-bar.stacked > span { border-radius: 0; }
+.ev-bar.stacked > span:first-child { border-radius: 4px 0 0 4px; }
+.ev-bar.stacked > span:last-of-type { border-radius: 0 4px 4px 0; }
+.ev-bar.stacked > span:only-of-type { border-radius: 4px; }
