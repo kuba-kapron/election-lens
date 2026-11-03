@@ -147,6 +147,11 @@ Rules agreed with the owner:
   owner approves are fetched (`fetch_commons_photos.py`) and credited in the footer (author,
   license with link). Wikimedia's APIs (/w/, /api/) are closed to scripts by robots.txt and
   its search and image servers rate-limit scripts: go slowly (one request every few seconds).
+- House (added 3 November): all 435 races from one civicAPI request per round (its race search,
+  type "House of Representatives"), written to live.json "house" keyed "SS-DD" like house.json,
+  drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
+  hand calls are not realistic. Previous result only where the state kept its 2024 map.
+  Louisiana's House vote on 3 November is an all-candidate primary (general 12 December).
 - Local first; going public later only needs an upload of live.json (ordinary hosting with
   SFTP/rsync and no caching of live.json, or the page's ?t= query).
 

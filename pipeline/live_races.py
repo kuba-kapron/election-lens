@@ -164,6 +164,37 @@ RACES = [
      "sources": [{"kind": "civicapi", "race": 87496}]},
 ]
 
+# Poll closing times for every state (House races), from the same CBS News list: (first close,
+# all closed) in UTC; one value means both. First close only where CBS says most of the state
+# closes an hour earlier (AK, FL, KY, TX) or the eastern part closes earlier (IN, KY: 6 p.m. ET).
+STATE_CLOSE = {
+    "AL": "01:00", "AK": ("05:00", "06:00"), "AZ": "02:00", "AR": "01:30", "CA": "04:00", "CO": "02:00",
+    "CT": "01:00", "DE": "01:00", "FL": ("00:00", "01:00"), "GA": "00:00", "HI": "05:00", "ID": "04:00",
+    "IL": "01:00", "IN": ("23:00", "00:00"), "IA": "03:00", "KS": "02:00", "KY": ("23:00", "00:00"),
+    "LA": "02:00", "ME": "01:00", "MD": "01:00", "MA": "01:00", "MI": "02:00", "MN": "02:00", "MS": "01:00",
+    "MO": "01:00", "MT": "03:00", "NE": "03:00", "NV": "03:00", "NH": "01:00", "NJ": "01:00", "NM": "02:00",
+    "NY": "02:00", "NC": "00:30", "ND": "03:00", "OH": "00:30", "OK": "01:00", "OR": "04:00", "PA": "01:00",
+    "RI": "01:00", "SC": "00:00", "SD": "02:00", "TN": "02:00", "TX": ("01:00", "02:00"), "UT": "03:00",
+    "VT": "00:00", "VA": "00:00", "WA": "04:00", "WV": "00:30", "WI": "02:00", "WY": "02:00",
+}
+
+
+def close_times(st):
+    """(polls_close, all_closed) as ISO times; 23:00 means the evening of 3 November."""
+    t = STATE_CLOSE[st]
+    first, last = t if isinstance(t, tuple) else (t, t)
+    iso = lambda hm: ("2026-11-03T" if hm >= "12:00" else "2026-11-04T") + hm + "Z"
+    return iso(first), iso(last)
+
+
+# House: all 435 races come from one civicAPI request (its race search); civicAPI's own race
+# calls are not used. Louisiana's House vote on 3 November is a primary with every candidate
+# on one ballot; its House general election is on 12 December (moved after the 2026 map;
+# Wikipedia, "2025–2026 United States redistricting").
+HOUSE_SEARCH = "https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives&election_date=2026-11-03&limit=1000"
+HOUSE_NOTES = {"LA": "Louisiana's House vote on 3 November is a primary with every candidate on one ballot; "
+                     "the House general election is on 12 December."}
+
 SUFFIXES = {"JR", "JR.", "SR", "SR.", "II", "III", "IV"}
 
 

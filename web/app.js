@@ -20,12 +20,12 @@
   async function loadLive() {
     let d = null;
     try { d = await d3.json(`data/live.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
-    extra.live = { races: { [LIVE_YEAR]: d ? d.races : [] }, updated: d ? d.updated : null };
+    extra.live = { races: { [LIVE_YEAR]: d ? d.races : [] }, house: d?.house || {}, updated: d ? d.updated : null };
   }
   async function ensureData(office, year) {
     if (+year === LIVE_YEAR) {
       if (!extra.live) await loadLive();
-      return;
+      if (office !== "house") return;
     }
     if (office === "senate" && !extra.senate) extra.senate = await d3.json("data/senate.json");
     if (office === "house" && !extra.house) extra.house = await d3.json("data/house.json");
@@ -51,13 +51,13 @@
   const HAS = {
     president: y => years.includes(y),
     senate: y => CONGRESS_YEARS.includes(y) || y === LIVE_YEAR,
-    house: y => CONGRESS_YEARS.includes(y),
+    house: y => CONGRESS_YEARS.includes(y) || y === LIVE_YEAR,
     governor: y => y === LIVE_YEAR,
   };
   const WHY_NOT = {
     president: y => `No presidential election in ${y}`,
     senate: () => "Senate results start in 2020",
-    house: y => (y === LIVE_YEAR ? "House races are not followed live tonight" : "House results start in 2020"),
+    house: () => "House results start in 2020",
     governor: () => "Governor results so far: 2026 only (live)",
   };
   // the race to show for a year: the one picked if that year has it, else president or Senate
@@ -659,7 +659,9 @@
     if (short) return n ? ordinal(n) : "At large";
     return n ? `${st}'s ${ordinal(n)} district` : `${st} at large`;
   }
-  const hRaces = () => extra.house.races[String(state.year)];
+  // a year's House races: the live file for 2026, house.json for 2020-2024
+  function houseRaces(y) { return (+y === LIVE_YEAR ? extra.live?.house : extra.house?.races[String(y)]) || {}; }
+  const hRaces = () => houseRaces(state.year);
   // the live page (election night 2026) reuses the Senate views: same race shape, one "year"
   const isLive = () => state.year === LIVE_YEAR;
   const senLike = () => state.office === "senate" || state.office === "governor";
@@ -761,6 +763,7 @@
         .attr("d", path) // district lines change from year to year
         .attr("fill", f => {
           const r = races[f.properties.id];
+          if (isLive()) return liveFill(r);
           return !r ? colors.nodata : congressCategorical() ? colors[ckey(r.cands[0].caucus) + "Solid"] : leanColor(raceLean(r));
         });
     }
@@ -839,20 +842,22 @@
         if (atLarge(st)) {
           const r = races[`${st}-00`];
           label = `${sname} <span class="ev">At large, 1 seat</span>`;
-          body = raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0);
+          body = isLive() ? liveTip(r) : raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0);
         } else {
           const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-"));
           const won = { D: 0, R: 0, I: 0 };
-          ds.forEach(([, r]) => won[r.cands[0].caucus]++);
+          const live = isLive(), shown = live ? ds.filter(([, r]) => counted(r)) : ds;
+          shown.forEach(([, r]) => won[raceLean(r)?.caucus ?? r.cands[0].caucus]++);
           label = `${sname} <span class="ev">${ds.length} districts</span>`;
-          body = `<span class="tip-note">${["D", "R", "I"].filter(c => won[c]).map(c => `${CAUCUS_NAME[c]} ${won[c]}`).join(", ")}</span>`;
+          body = live && !shown.length ? `<span class="tip-note">No votes counted yet</span>`
+            : `<span class="tip-note">${live ? "Leading: " : ""}${["D", "R", "I"].filter(c => won[c]).map(c => `${CAUCUS_NAME[c]} ${won[c]}`).join(", ")}</span>`;
           hint = `<span class="hint">Click to see ${sname}'s districts</span>`;
         }
       } else {
         hoverPath.attr("d", null);
         const r = races[f.properties.id];
         label = districtName(f.properties.id);
-        body = r ? raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0) : "No result";
+        body = !r ? "No result" : isLive() ? liveTip(r) : raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0);
       }
     }
     tip.innerHTML = `<strong>${label}</strong>${body}${extraLine}${hint}`;
@@ -1220,6 +1225,7 @@
   }
   function drawLivePanel() {
     drawLiveSources();
+    if (state.office === "house") return drawLiveHousePanel();
     const s = state.sel, st = stateOf(s);
     let html;
     if (s.type === "nation") {
@@ -1261,6 +1267,56 @@
       setYear(+b.dataset.prevYear);
     }));
   }
+  // ---------- live House: 435 races, leaders only (no calls) ----------
+  function liveHouseTally(races) {
+    const t = { D: 0, R: 0, I: 0, none: 0 };
+    for (const r of races) { const l = counted(r) ? raceLean(r) : null; if (l) t[l.caucus]++; else t.none++; }
+    return t;
+  }
+  function liveHouseNationBody() {
+    const rs = Object.values(hRaces());
+    if (!rs.length) return `<p class="empty">No House results yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
+    const t = liveHouseTally(rs);
+    const row = (p, n) => `<div class="cand-row">${partyAvatar(p, colors[ckey(p) + "Solid"])}<div class="cand-main"><span class="name">${CAUCUS_NAME[p]} leading</span><span class="pct">${n}</span>
+      <div class="bar ev-bar" style="--need:${218 / 435}"><span style="width:${(n / 435) * 100}%;background:${colors[ckey(p) + "Solid"]}"></span><i class="need" title="218 for a majority"></i></div>
+      <span class="votes">${n} of 435 districts</span></div></div>`;
+    const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
+    return `${test}<div class="cand">${row("D", t.D)}${row("R", t.R)}</div>
+      <p class="summary">${t.none ? `${t.none} districts have no votes counted yet. ` : ""}${t.I ? `Other candidates lead in ${t.I}. ` : ""}A majority needs 218 seats.</p>
+      <p class="note">Leading means ahead in the votes counted so far, not won. House races are not marked as called here. Counts: civicAPI (unofficial).</p>`;
+  }
+  function drawLiveHousePanel() {
+    const s = state.sel, st = stateOf(s), races = hRaces();
+    let html;
+    if (s.type === "nation") {
+      html = `<h2>United States</h2><p class="where">House, election night, 3 November 2026</p>` + liveHouseNationBody();
+    } else if (s.type === "district" || atLarge(st)) {
+      const id = s.type === "district" ? s.id : `${st}-00`, r = races[id];
+      html = `<h2>${districtName(id)}</h2><p class="where">House, 2026</p>` + (r ? liveRaceBody(r) + notesList(r.notes) : `<p class="empty">No result.</p>`);
+    } else {
+      const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-")).sort();
+      const t = liveHouseTally(ds.map(([, r]) => r));
+      const items = ds.map(([id, r]) => {
+        const l = counted(r) ? raceLean(r) : null;
+        return `<li><button type="button" data-dist="${id}"><span class="what">${districtName(id, true)}</span>
+          <span class="who">${l ? `${r.cands[l.lead].name}${partyTag(r.cands[l.lead])}` : `<span class="muted">${liveStatus(r)}</span>`}</span>${l ? leanLabel(l) : ""}</button></li>`;
+      });
+      const lead = ["D", "R", "I"].filter(c => t[c]).map(c => `${CAUCUS_NAME[c]} ${t[c]}`).join(", ");
+      html = `<h2>${data.states[st].name}</h2><p class="where">House, 2026 · ${ds.length} districts</p>
+        <p class="summary">${lead ? `Leading: ${lead}.` : "No votes counted yet."}</p>${notesList(ds[0]?.[1].notes)}
+        <h3>Districts</h3><ul class="race-list">${items.join("")}</ul>`;
+    }
+    const actions = [];
+    if (s.type === "district" && !atLarge(st)) actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
+    if (s.type !== "nation") actions.push(`<button class="quiet" data-act="nation">Show whole country</button>`);
+    if (actions.length) html += `<div class="actions">${actions.join("")}</div>`;
+    panel.innerHTML = html;
+    panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () =>
+      select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
+    panel.querySelectorAll("[data-dist]").forEach(b => b.addEventListener("click", () => select({ type: "district", id: b.dataset.dist }, true)));
+    panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => setYear(+b.dataset.prevYear)));
+  }
+
   // re-read the results file every 30 seconds; redraw only when it changed
   setInterval(async () => {
     if (!isLive()) return;
@@ -1384,7 +1440,7 @@
     if (o !== "president") { state.mode = "margin"; state.arrows = false; }
     if (o === "house" && state.level === "counties") state.level = "states";
     // a district number means a different place after redistricting: go back to its state
-    if (state.sel.type === "district" && (o !== "house" || !extra.house.races[y][state.sel.id])) state.sel = { type: "state", id: stateOf(state.sel) };
+    if (state.sel.type === "district" && (o !== "house" || !houseRaces(y)[state.sel.id])) state.sel = { type: "state", id: stateOf(state.sel) };
     if (state.sel.type === "county" && o === "house") state.sel = { type: "state", id: stateOf(state.sel) };
     syncToggles();
     drawHeadline();
@@ -1484,8 +1540,10 @@
       h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
       dek.textContent = (state.office === "governor"
         ? "The governor races in Ohio and Texas as the votes are counted."
+        : state.office === "house" ? "All 435 House races as the votes are counted, by district, on the 2026 maps (nine states redrew). House counts are unofficial (civicAPI), and House races are shown as leading, not called."
         : "All 35 Senate races as the votes are counted; the governor races in Ohio and Texas are under Governor.")
-        + " Official state results where the state publishes them, otherwise unofficial counts, always labeled. Updates every minute; times are in your time zone.";
+        + (state.office === "house" ? "" : " Official state results where the state publishes them, otherwise unofficial counts, always labeled.")
+        + " Updates every minute; times are in your time zone.";
     }
     document.title = state.office === "president" ? "Election Lens"
       : isLive() ? "Election night 2026 · Election Lens" : `${state.office === "senate" ? "Senate" : "House"} results · Election Lens`;
@@ -1579,7 +1637,7 @@
     state.seat = seat === "special" || seat === "governor" ? seat : "regular";
     state.round = null;
     if (id && id.length === 2 && data.states[id]) state.sel = { type: "state", id };
-    else if (id && id.includes("-") && state.office === "house" && extra.house.races[state.year][id]) state.sel = { type: "district", id };
+    else if (id && id.includes("-") && state.office === "house" && houseRaces(state.year)[id]) state.sel = { type: "district", id };
     else if (id && state.office !== "house" && data.counties[id]) state.sel = { type: "county", id };
     else state.sel = { type: "nation" };
   }

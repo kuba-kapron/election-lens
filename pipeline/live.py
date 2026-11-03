@@ -166,9 +166,74 @@ def build(race, reading, src, errors, manual, calls, senate):
     return out
 
 
-def write(races):
+PARTY = {"Democratic": "D", "Republican": "R", "Libertarian": "L", "Green": "G", "Independent": "I"}
+
+
+def house(args, started, history, plans):
+    """All 435 House races from one civicAPI request: {"SS-DD": race}, shaped like house.json's
+    races so the page can reuse its House views, plus live fields (pct, source, status).
+    The previous result is the same district in 2024, only where the state kept its map."""
+    try:
+        d = json.loads(F.fetch(LR.HOUSE_SEARCH))
+    except (F.Refused, ValueError) as e:
+        print(f"{time.strftime('%H:%M:%S')} House   none: {e}", flush=True)
+        return {}
+    out = {}
+    for r in d.get("races", []):
+        if r.get("type") != "House of Representatives" or not (r.get("election_date") or "").startswith("2026-11-03"):
+            continue
+        st, dist = r.get("province"), str(r.get("district") or "")
+        if st not in S.ABBR_TO_FIPS or "-" not in dist:
+            continue
+        num = dist.split("-")[1]
+        did = f"{S.ABBR_TO_FIPS[st]}-{'00' if num == 'AL' else num.zfill(2)}"
+        cands, votes, other = [], [], 0
+        for c in r.get("candidates") or []:
+            n = int(c.get("votes") or 0)
+            if "write" in c["name"].lower():
+                other += n
+                continue
+            name = " ".join(c["name"].replace('"', "").split())
+            last = LR.last_name(name)
+            m = C.member(st, name.split(" ", 1)[0], last, "rep", 2026)
+            p = {"name": name, "last": last, "party": PARTY.get(c.get("party"), "O"),
+                 "caucus": PARTY.get(c.get("party")) if c.get("party") in ("Democratic", "Republican") else "I",
+                 "inc": C.sitting(m, "rep", 2026), "photo": f"{st.lower()}-{last.lower()}"}
+            if m:
+                p["bio"] = m["bio"]
+            cands.append(p)
+            votes.append(n)
+        test = bool(r.get("test_data"))
+        if test and not args.allow_test:
+            votes, other = [0] * len(votes), 0
+        order = sorted(range(len(votes)), key=lambda i: -votes[i])
+        first, last_close = LR.close_times(st)
+        total = sum(votes) + other
+        race = {"st": S.ABBR_TO_FIPS[st], "cands": [cands[i] for i in order],
+                "rounds": [{"kind": "general", "label": "Votes counted so far", "votes": [votes[i] for i in order],
+                            "other": other, "total": total}],
+                "pct": r.get("percent_reporting"), "pct_of": "expected vote (civicAPI estimate)",
+                "polls_close": first, "all_closed": last_close, "status": "counting" if total else "no votes yet",
+                "source": {"name": "civicAPI", "url": "https://civicapi.org/", "official": False, "kind": "civicapi",
+                           "fetched": iso(F.cached(LR.HOUSE_SEARCH)[1]), "as_of": None},
+                "test": test and args.allow_test, "notes": [LR.HOUSE_NOTES[st]] if st in LR.HOUSE_NOTES else []}
+        fips = S.ABBR_TO_FIPS[st]
+        if plans.get("2026", {}).get(fips) != 2026:  # same map as 2024: same district, comparable
+            prev = history.get("2024", {}).get(did)
+            if prev and prev.get("rounds"):
+                rd = prev["rounds"][-1]
+                race["prev"] = {"year": 2024, "seat": "regular", "total": rd["total"],
+                                "cands": [{"name": c["name"], "party": c["party"], "caucus": c["caucus"], "votes": rd["votes"][i]}
+                                          for i, c in enumerate(prev["cands"])]}
+        out[did] = race
+    counted = sum(1 for x in out.values() if x["rounds"][0]["total"])
+    print(f"{time.strftime('%H:%M:%S')} House   civicapi  {len(out)} races, {counted} with votes", flush=True)
+    return out
+
+
+def write(races, house_races):
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    data = {"updated": iso(time.time()), "year": 2026, "races": races}
+    data = {"updated": iso(time.time()), "year": 2026, "races": races, "house": house_races}
     tmp = OUT.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
     os.replace(tmp, OUT)  # the page never sees a half-written file
@@ -182,6 +247,8 @@ def main():
     ap.add_argument("--every", type=int, default=60, help="seconds between rounds (sites are asked at most every 3 min)")
     args = ap.parse_args()
     senate = json.loads((ROOT / "web/data/senate.json").read_text())
+    history = json.loads((ROOT / "web/data/house.json").read_text())["races"]
+    plans = json.loads((ROOT / "web/data/house/plans.json").read_text())
     started = time.time()
     while True:
         manual, calls = load(MANUAL), load(CALLS)
@@ -194,7 +261,7 @@ def main():
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"
             print(f"{time.strftime('%H:%M:%S')} {race['id']:7} {(r.get('source') or {}).get('kind') or 'none':9} {pct:>4}  {lead}"
                   + (f"   [{'; '.join(errors)}]" if errors else ""), flush=True)
-        write(races)
+        write(races, {} if args.replay else house(args, started, history, plans))
         if args.once:
             return 0
         time.sleep(args.every)
