@@ -23,4 +23,12 @@ fi
 unzip -o -q "$RAW/tonmcg/cartography/2020/build/cb_2019_us_county_500k.zip" -d "$RAW/c2019"
 unzip -o -q "$RAW/tonmcg/cartography/2024/build/cb_2023_us_county_500k.zip" -d "$RAW/c2023"
 
+# city labels: Natural Earth populated places (public domain), built by pipeline/build_places.sh
+if [ ! -f "$RAW/places/ne_10m_populated_places_simple.shp" ]; then
+  mkdir -p "$RAW/places"
+  curl -sSfL -A "ElectionLens/0.1 (election results map, hobby project)" -o "$RAW/places/places.zip" \
+    https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places_simple.zip
+  unzip -o -q "$RAW/places/places.zip" -d "$RAW/places"
+fi
+
 echo "Raw data ready in $RAW"

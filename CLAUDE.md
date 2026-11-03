@@ -25,6 +25,11 @@ US presidential results 2000–2024 on one static page (`web/`):
   to the wordmark (own row on phones); races without data that year are greyed out
   with the reason on hover. Switching years keeps the race when that year has it, else
   President, else Senate (decided with the owner on 3 November 2026).
+- City names on the map (added 3 November 2026): the largest metros for the whole country,
+  more as you zoom in; the selected state's cities first, neighbors in grey; a name goes right
+  of its dot, else left, below or above, never over another name, and avoids covering other
+  cities' dots; same screen size at every zoom and screen width. Alaska and Hawaii cities show
+  only for the country or their own state (their insets sit near other states).
 - Shareable links: `#year=2024&view=shift&map=counties&vote=popular&arrows=on&place=48201`.
   Defaults are left out of the link; old `#2024/margin/48201` links still work.
 
@@ -34,6 +39,8 @@ US presidential results 2000–2024 on one static page (`web/`):
 pipeline/fetch_data.sh       raw sources -> data/raw/ (gitignored)
 pipeline/build_geo.sh        county shapes -> web/data/geo.json (needs mapshaper)
 pipeline/build_results.py    results + electoral votes -> web/data/results.json (stdlib only)
+pipeline/build_places.sh    Natural Earth populated places -> web/data/places.json (city labels:
+                             US cities projected like the map, largest first; mapshaper)
 pipeline/build_photos.py     photos/ originals -> web/img/candidates/*.jpg + photos.json;
                              photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
 pipeline/fetch_congress.sh   FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
