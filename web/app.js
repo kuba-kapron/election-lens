@@ -1573,7 +1573,7 @@
       h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
       dek.textContent = (state.office === "governor"
         ? "All 36 governor races as the votes are counted."
-        : state.office === "house" ? "All 435 House races as the votes are counted, by district, on the 2026 maps (nine states redrew). House counts are unofficial (civicAPI), and House races are shown as leading, not called."
+        : state.office === "house" ? "All 435 House races as the votes are counted, by district, on the 2026 maps (nine states redrew). Official state results where we read them (each district names its source), unofficial counts from civicAPI elsewhere; House races are shown as leading, not called."
         : "All 35 Senate races as the votes are counted; the 36 governor races are under Governor.")
         + (state.office === "house" ? "" : " Official state results where the state publishes them, otherwise unofficial counts, always labeled.")
         + " Updates every minute; times are in your time zone.";

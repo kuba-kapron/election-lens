@@ -164,7 +164,13 @@ Rules agreed with the owner:
   Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
   (Vice President Vance breaks ties).
 - House (added 3 November): all 435 races from one civicAPI request per round (its race search,
-  type "House of Representatives"), written to live.json "house" keyed "SS-DD" like house.json,
+  type "House of Representatives"), then official results replace them district by district
+  for 13 states from the files already read for Senate/governor (pipeline/live_house.py: NC,
+  SC, IA, FL, TX, GA, VA, OR, NY, DE, SD; 150 districts). Tested against certified 2024 House
+  results where the site keeps 2024: NC, SC, IA, FL, GA, VA, every contested district within
+  0.5%. Florida's file is in the Windows character set (cp1252). Not yet: AZ, RI (report
+  names unknown until published), MD (one page per contest). Written to live.json "house"
+  keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.
   Louisiana's House vote on 3 November is an all-candidate primary (general 12 December).

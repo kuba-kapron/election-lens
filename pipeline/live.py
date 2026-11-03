@@ -21,6 +21,7 @@ from pathlib import Path
 
 import congress as C
 import live_fetch as F
+import live_house as LH
 import live_races as LR
 import live_sources as S
 
@@ -276,9 +277,50 @@ def house(args, started, history, plans):
                                 "cands": [{"name": c["name"], "party": c["party"], "caucus": c["caucus"], "votes": rd["votes"][i]}
                                           for i, c in enumerate(prev["cands"])]}
         out[did] = race
+    official = official_house(out) if not args.replay else 0
     counted = sum(1 for x in out.values() if x["rounds"][0]["total"])
-    print(f"{time.strftime('%H:%M:%S')} House   civicapi  {len(out)} races, {counted} with votes", flush=True)
+    print(f"{time.strftime('%H:%M:%S')} House   {len(out)} races, {counted} with votes; "
+          f"{official} from official state results, the rest civicAPI", flush=True)
     return out
+
+
+def official_house(races):
+    """Replace civicAPI's numbers with the state's own, district by district, where the state's
+    file has the district (pipeline/live_house.py). A district keeps civicAPI if the state's
+    file has no votes for it yet while civicAPI has some. Returns how many districts are official."""
+    n = 0
+    for st, spec in LH.HOUSE.items():
+        try:
+            readings = spec["read"](spec)
+        except (F.Refused, ValueError, KeyError, OSError) as e:
+            print(f"{time.strftime('%H:%M:%S')} House   {st}: {e}", flush=True)
+            continue
+        except Exception as e:  # a reader bug must not stop the night
+            print(f"{time.strftime('%H:%M:%S')} House   {st}: {type(e).__name__}: {e}", flush=True)
+            continue
+        for d, rd in readings.items():
+            race = races.get(f"{S.ABBR_TO_FIPS[st]}-{d}")
+            if not race or (rd.total == 0 and race["rounds"][0]["total"] > 0):
+                continue
+            cands = race["cands"]
+            votes = [0] * len(cands)
+            for raw, v in zip(rd.names, rd.votes):
+                scores = [C.matches(raw, c["last"], c["name"].split(" ", 1)[0]) for c in cands]
+                best = max(scores, default=0)
+                if best and scores.count(best) == 1:
+                    votes[scores.index(best)] += v
+            order = sorted(range(len(cands)), key=lambda i: -votes[i])
+            race["cands"] = [cands[i] for i in order]
+            race["rounds"] = [{"kind": "general", "label": "Votes counted so far", "votes": [votes[i] for i in order],
+                               "other": rd.total - sum(votes), "total": rd.total}]
+            race["pct"] = round(rd.pct, 1) if rd.pct is not None else None
+            race["pct_of"] = rd.pct_of
+            race["status"] = "counting" if rd.total else "no votes yet"
+            race["test"] = False
+            race["source"] = {"name": spec["name"], "url": None, "official": True, "kind": "official",
+                              "fetched": iso(rd.fetched), "as_of": rd.as_of}
+            n += 1
+    return n
 
 
 def write(races, house_races, senate_not_up):

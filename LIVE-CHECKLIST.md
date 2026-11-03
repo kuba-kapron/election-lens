@@ -43,7 +43,9 @@ then switch by themselves; Florida the same once its file fills in.
 
 Official sources usually post the first numbers 15–45 minutes after polls close.
 
-House: all 435 races come from civicAPI in one request per round (unofficial), on the 2026
+House: official state results for 150 districts (NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD;
+Florida and Virginia once their files fill in); the other districts from civicAPI in one request
+per round (unofficial), on the 2026
 district maps, and show who is leading, never who won. The importer prints one House line
 per round ("435 races, N with votes"). Louisiana's House vote tonight is a primary.
 

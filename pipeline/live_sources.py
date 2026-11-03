@@ -146,7 +146,11 @@ FL_URL = ("https://results.elections.myflorida.com/ResultsExtract.Asp?ElectionDa
 
 
 def read_fl(race, src):
-    text = F.fetch(FL_URL).decode("utf-8", "replace")
+    raw = F.fetch(FL_URL)
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:  # Florida writes its file in the Windows character set
+        text = raw.decode("cp1252")
     if not text.startswith("ElectionDate"):
         raise ValueError("FL: results file not available yet (it opens when polls close)")
     names, parties, votes, counties, prec = [], [], {}, {}, {}
