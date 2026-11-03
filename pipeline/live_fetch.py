@@ -3,6 +3,8 @@
 Rules (agreed with the owner, 3 November 2026):
 - at most one request per address every MIN_INTERVAL seconds; a call that comes sooner gets
   the stored copy instead of a new request;
+- at least SPACING seconds between any two requests to the same site, so many addresses on
+  one site (civicAPI's 35 Senate races) are asked one after another, not all at once;
 - identify honestly as ElectionLens, with no browser disguise and no personal details;
 - follow robots.txt, read once per site;
 - ask "changed since?" (ETag / Last-Modified) so unchanged files are not downloaded again;
@@ -28,11 +30,12 @@ ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "data" / "raw" / "live"
 USER_AGENT = "ElectionLens/0.1 (election results map, hobby project)"
 MIN_INTERVAL = 180  # seconds between requests to the same address
+SPACING = 1.5  # seconds between requests to the same site
 BLOCK_AFTER = 3  # refusals in a row before a site is left alone
 TIMEOUT = 45
 
 _robots = {}
-_state = {}  # per host: {"fails": n, "wait_until": t}
+_state = {}  # per host: {"fails": n, "wait_until": t, "last": t}
 
 
 class Refused(Exception):
@@ -103,6 +106,10 @@ def fetch(url, min_interval=MIN_INTERVAL):
     if not _allowed(url):
         hs["fails"] = BLOCK_AFTER
         raise Refused(f"{host}: robots.txt does not allow {url}")
+    gap = time.time() - hs.get("last", 0)
+    if gap < SPACING:
+        time.sleep(SPACING - gap)
+    hs["last"] = time.time()
     headers = {"User-Agent": USER_AGENT}
     if body_path.exists():
         if meta.get("etag"):
@@ -112,6 +119,10 @@ def fetch(url, min_interval=MIN_INTERVAL):
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=TIMEOUT) as r:
             data = _plain(r.read(), url)
+            if b"captcha" in data[:20000].lower() and b"<html" in data[:2000].lower():
+                # a bot-check page, not results: treat it as a refusal, never try to get past it
+                hs["fails"] = BLOCK_AFTER
+                raise Refused(f"{host}: answered with a bot check (captcha); left alone")
             meta = {"url": url, "fetched": now, "etag": r.headers.get("ETag"),
                     "last_modified": r.headers.get("Last-Modified")}
             body_path.write_bytes(data)

@@ -1200,7 +1200,18 @@
     return `${test}<p class="summary">${extra.live.updated ? `Updated ${clock(extra.live.updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
       <ul class="race-list">${items.join("")}</ul>`;
   }
+  // footer: name the official sources the live results come from right now
+  function drawLiveSources() {
+    const el = document.getElementById("live-sources");
+    if (!el) return;
+    const official = new Map();
+    for (const r of liveRaces()) if (r.source && r.source.official) official.set(r.source.name, r.source.url);
+    const list = [...official].sort((a, b) => a[0].localeCompare(b[0])).map(([n, u]) => (u ? `<a href="${u}">${n}</a>` : n));
+    const joined = list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : list[0];
+    el.innerHTML = `2026 results, live: ${list.length ? `official results from ${joined}; ` : ""}unofficial counts from <a href="https://civicapi.org/">civicAPI</a> where states do not publish live data or block scripts; entries typed in by hand name their source. Poll closing times: <a href="https://www.cbsnews.com/news/when-polls-open-close-2026-midterm-elections/">CBS News</a>.`;
+  }
   function drawLivePanel() {
+    drawLiveSources();
     const s = state.sel, st = stateOf(s);
     let html;
     if (s.type === "nation") {
@@ -1465,7 +1476,7 @@
       h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
       dek.textContent = (state.office === "governor"
         ? "The governor races in Ohio and Texas as the votes are counted."
-        : "Ten Senate races as the votes are counted; the governor races in Ohio and Texas are under Governor.")
+        : "All 35 Senate races as the votes are counted; the governor races in Ohio and Texas are under Governor.")
         + " Official state results where the state publishes them, otherwise unofficial counts, always labeled. Updates every minute; times are in your time zone.";
     }
     document.title = state.office === "president" ? "Election Lens"

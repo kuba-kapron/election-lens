@@ -8,8 +8,7 @@ on its next round (within a minute).
     uv run pipeline/live_manual.py show
 
 Names are last names as the page shows them; race ids are in pipeline/live_races.py
-(NC-sen, SC-sen, GA-sen, FL-sen, OH-sen, OH-gov, MI-sen, ME-sen, MS-sen, TX-sen, TX-gov,
-LA-sen). Every entry needs its source, which the page shows. --total is all votes counted,
+(two-letter state + "-sen" for the 35 Senate races, plus OH-gov and TX-gov). Every entry needs its source, which the page shows. --total is all votes counted,
 including other candidates; without it, the listed candidates' votes are the total.
 """
 
@@ -38,7 +37,7 @@ def save(path, data):
 
 
 def last_names(race):
-    return {n.split(" ")[-1].lower(): n.split(" ")[-1] for n, _ in race["cands"]}
+    return {LR.last_name(n).lower(): LR.last_name(n) for n, _ in race["cands"]}
 
 
 def race_id(text):

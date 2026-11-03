@@ -19,12 +19,23 @@ Times are Warsaw time (CET).
 
 ## When polls close
 
-| Warsaw | Races | Source |
-|---|---|---|
-| 01:00 | Georgia, South Carolina, Florida (most of the state) | GA: civicAPI · SC: official · FL: official |
-| 01:30 | North Carolina, Ohio (Senate + governor) | NC: official · OH: civicAPI |
-| 02:00 | Michigan, Maine, Mississippi, Texas (Senate + governor), rest of Florida | TX: official (statewide) · others: civicAPI |
-| 03:00 | Louisiana; last polls in Michigan and Texas | LA: civicAPI |
+| Warsaw | Races |
+|---|---|
+| 00:00 | Kentucky (most of the state closes an hour earlier) |
+| 01:00 | Georgia, South Carolina, Virginia, Florida (most) |
+| 01:30 | North Carolina, Ohio (Senate + governor), West Virginia |
+| 02:00 | Alabama, Delaware, Illinois, Maine, Massachusetts, Mississippi, New Hampshire, New Jersey, Oklahoma, Rhode Island, rest of Florida, Texas (most) |
+| 02:30 | Arkansas |
+| 03:00 | Colorado, Kansas, Louisiana, Michigan, Minnesota, New Mexico, South Dakota, Tennessee, Wyoming, rest of Texas |
+| 04:00 | Iowa, Montana, Nebraska |
+| 05:00 | Idaho, Oregon |
+| 06:00–07:00 | Alaska |
+
+Times from CBS News (the moment a state's last polls close). Official state results are read
+for North Carolina, South Carolina, Georgia, Florida, Texas, Virginia, Iowa, Delaware, South
+Dakota, Oregon and Rhode Island; every other race comes from civicAPI (unofficial, labeled on
+the page). Virginia and Rhode Island show civicAPI until their official report has numbers,
+then switch by themselves; Florida the same once its file fills in.
 
 Official sources usually post the first numbers 15–45 minutes after polls close.
 
@@ -49,8 +60,7 @@ uv run pipeline/live_manual.py set MI-sen El-Sayed=1234567 Rogers=1200345 --pct 
 uv run pipeline/live_manual.py clear MI-sen          # back to automatic
 ```
 
-Race ids: NC-sen, SC-sen, GA-sen, FL-sen, OH-sen, OH-gov, MI-sen, ME-sen, MS-sen, TX-sen,
-TX-gov, LA-sen. The page shows the source you type.
+Race ids: the two-letter state plus "-sen" (e.g. MI-sen, NH-sen), and OH-gov, TX-gov. The page shows the source you type.
 
 ## Race calls
 

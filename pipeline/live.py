@@ -43,7 +43,7 @@ def people(race):
     """Candidates as the page shows them, with Congress IDs (portraits) and incumbency."""
     out = []
     for name, party in race["cands"]:
-        first, last = name.split(" ", 1)[0], name.split(" ")[-1]
+        first, last = name.split(" ", 1)[0], LR.last_name(name)
         chamber = "sen" if race["office"] == "senate" else None
         m = C.member(race["st"], first, last, chamber or "sen", 2026)
         p = {"name": name, "last": last, "party": party, "caucus": party if party in ("D", "R") else "I",
@@ -56,12 +56,14 @@ def people(race):
 
 
 def index_of(race, raw):
-    """Which listed candidate a source's name is, or None (counted as other)."""
-    for i, (name, _) in enumerate(race["cands"]):
-        last, first = name.split(" ")[-1], name.split(" ", 1)[0]
-        if C.matches(raw, last, first):
-            return i
-    return None
+    """Which listed candidate a source's name is, or None (counted as other).
+
+    The best match wins (last and first name over last name only), so two candidates with
+    one surname stay apart (Alaska: Dan Sullivan and Daniel J. Sullivan Jr.); a tie is None.
+    """
+    scores = [C.matches(raw, LR.last_name(name), name.split(" ", 1)[0]) for name, _ in race["cands"]]
+    best = max(scores, default=0)
+    return scores.index(best) if best and scores.count(best) == 1 else None
 
 
 def align(race, names, votes_by_name, total):
@@ -89,10 +91,10 @@ def previous(race, senate):
 
 
 def read_race(race, args, started):
-    """(reading, source kind, errors) for the first source with votes."""
+    """(reading, source, errors) for the first source with votes."""
     errors, first_ok = [], None
     if args.replay:
-        return S.read_replay(race, {}, started, args.replay), "replay", errors
+        return S.read_replay(race, {}, started, args.replay), {"kind": "replay"}, errors
     for src in race["sources"]:
         try:
             r = S.READERS[src["kind"]](race, src)
@@ -106,17 +108,20 @@ def read_race(race, args, started):
             errors.append(f"{src['kind']}: test data, not shown")
             continue
         if r.total > 0:
-            return r, src["kind"], errors
-        first_ok = first_ok or (r, src["kind"])
+            return r, src, errors
+        first_ok = first_ok or (r, src)
     return (*first_ok, errors) if first_ok else (None, None, errors)
 
 
-def build(race, reading, kind, errors, manual, calls, senate):
+def build(race, reading, src, errors, manual, calls, senate):
     now = time.time()
     out = {"id": race["id"], "st": S.ABBR_TO_FIPS[race["st"]], "office": race["office"], "seat": race["seat"],
            "polls_close": race["polls_close"], "all_closed": race.get("all_closed", race["polls_close"]),
            "cands": people(race), "prev": previous(race, senate), "errors": errors}
-    name, url, official = LR.SOURCE_NAMES[kind or "manual"]
+    kind = src["kind"] if src else None
+    name, url, official = LR.SOURCE_NAMES.get(kind or "manual", ("", None, True))
+    if src and src.get("name"):  # official sources that name themselves (Clarity, Enhanced Voting states)
+        name, url, official = src["name"], src.get("page"), True
     m = manual.get(race["id"])
     if m:  # typed in by hand: overrides the sources
         v = [int(m["votes"].get(c["last"], 0)) for c in out["cands"]]
@@ -182,8 +187,8 @@ def main():
         manual, calls = load(MANUAL), load(CALLS)
         races = []
         for race in LR.RACES:
-            reading, kind, errors = read_race(race, args, started)
-            r = build(race, reading, kind, errors, manual, calls, senate)
+            reading, src, errors = read_race(race, args, started)
+            r = build(race, reading, src, errors, manual, calls, senate)
             races.append(r)
             lead = ", ".join(f"{c['last']} {r['rounds'][0]['votes'][i]:,}" for i, c in enumerate(r["cands"][:2])) if r.get("rounds") else "-"
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"

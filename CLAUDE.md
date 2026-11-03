@@ -105,15 +105,17 @@ Decided with the owner:
 
 ## Live results, US midterms, 3 November 2026 (built 3 November)
 
-Polls close from about 01:00 Warsaw time on 4 November. Twelve races: Senate in Texas,
-Michigan, Georgia, North Carolina, South Carolina, Florida (special), Louisiana, Mississippi,
-Maine, Ohio (special); governor in Ohio and Texas. Page: year 2026, Senate or Governor
+Polls close from about 00:00 Warsaw time on 4 November. All 35 Senate races (Florida and Ohio
+are specials) and the governor races in Ohio and Texas. The first twelve (Senate in TX, MI, GA,
+NC, SC, FL, LA, MS, ME, OH; governor in OH, TX) were the owner's list; the other 25 Senate
+races were added the same day, from civicAPI only. Poll closing times: CBS News. Page: year 2026, Senate or Governor
 (`#race=senate&year=2026`; old `#race=live` links still open it).
 
 ```
-pipeline/live_races.py   the 12 races: candidates, poll closing times, sources in order
-pipeline/live_sources.py readers: NC (precinct zip), SC (Clarity JSON + county XML),
-                         FL (county extract), TX (statewide HTML), civicAPI (unofficial)
+pipeline/live_races.py   the 37 races: candidates, poll closing times, sources in order
+pipeline/live_sources.py readers: NC (precinct zip), Clarity (SC, IA: JSON + county XML),
+                         FL (county extract), TX (statewide HTML), Enhanced Voting (GA, VA,
+                         RI: Excel/CSV report), DE (JSON), SD (CSV), OR (page), civicAPI
 pipeline/live_fetch.py   polite fetching: every request goes through it
 pipeline/live.py         importer loop -> web/data/live.json (not committed); --replay to test
 pipeline/live_manual.py  numbers or race calls typed in by hand -> data/live/ (not committed)
@@ -129,10 +131,13 @@ Rules agreed with the owner:
   state/county sites and sometimes local media) as fallback, always labeled; its test data is
   never shown as real. Manual entries override both and name their source.
 - No race calls of our own: a race is marked won only when entered by hand with who called it.
-- What we found: Louisiana's robots.txt forbids scripts on its results data; Ohio's and
-  Michigan's state sites block all scripts (JavaScript check); Georgia's API is open but its
-  contest data loads through code we did not untangle (check its media export link tonight);
-  Mississippi and Maine have no statewide live results. So LA, GA, OH, MI, MS, ME use civicAPI.
+- Official live sources (surveyed 3 November, each tested on an earlier election where the
+  site keeps one): NC, SC, FL, TX, GA, VA, IA, DE, SD, OR, RI. Refused or blocked scripts
+  (403, captcha or JavaScript check): OH, MI, KY, OK, NM, MT, ID, AR, MN (captcha), and
+  Clarity's shared domain (results.enr.clarityelections.com, used by CO, WV, AL). Louisiana's
+  robots.txt forbids its results data. No statewide live results: MS, ME, NH, MA, NJ, IL, AK
+  (PDF summary only), WY, KS. Nebraska's results host does not resolve from here. All of
+  those use civicAPI. The footer names the official sources in use from live.json.
 - Candidate photos for people without an official congressional portrait come from Wikimedia
   Commons: `find_commons_photos.py` (Wikipedia article infobox -> Commons file page, free
   licenses only: public domain, CC0, CC BY, CC BY-SA) writes a review sheet; only photos the
@@ -148,6 +153,11 @@ races later). Sources: MEDSL "State Precinct-Level Returns" per state (2022 and 
 CC0; 2020 behind the Dataverse guestbook, so the owner downloads it), each race checked against
 its state's certified statewide result (no FEC-style national source for governors). The
 per-state files total about 2 GB: ask before downloading.
+
+Also after election night: tidy pipeline/ into topic folders (common/ with the polite fetcher,
+xlsx and state codes; president/, congress/, photos/, live/), run as `uv run -m pipeline.<topic>.<script>`;
+check that every build's output is byte-for-byte unchanged. Agreed 3 November 2026, postponed so
+tonight's tested live scripts and checklist stay as they are.
 
 Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland
 (PKW results down to gmina, live for the 2027 parliamentary election), more countries.

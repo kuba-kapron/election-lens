@@ -45,7 +45,7 @@ class Reading:
 
 def _county_key(name):
     name = re.sub(r"\b(county|parish)\b", "", name, flags=re.I)
-    return re.sub(r"[^A-Z]", "", name.upper().replace("SAINT", "ST"))
+    return re.sub(r"[^A-Z]", "", name.upper().replace("SAINT", "ST").replace("&", "AND"))
 
 
 _COUNTIES = None
@@ -104,14 +104,16 @@ def read_nc(race, src):
                    counties=counties, fetched=_fetched(NC_URL))
 
 
-# ---------- South Carolina: Clarity (summary JSON + county XML) ----------
-def read_sc(race, src):
-    base = f"https://www.enr-scvotes.org/SC/{src['election']}"
+# ---------- Clarity (South Carolina, Iowa): summary JSON + county XML ----------
+def read_clarity(race, src):
+    """Any state's Clarity results site: src["base"] is its election address,
+    e.g. https://electionresults.iowa.gov/IA/127077."""
+    base = src["base"]
     ver = F.fetch(f"{base}/current_ver.txt").decode().strip()
     summary = json.loads(F.fetch(f"{base}/{ver}/json/en/summary.json"))
     c = next((x for x in summary if x.get("C") == src["contest"]), None)
     if c is None:
-        raise ValueError(f"SC: no contest {src['contest']!r}")
+        raise ValueError(f"Clarity {base}: no contest {src['contest']!r}")
     names = [re.sub(r"^[A-Z]{3}\s+", "", n) for n in c["CH"]]
     reading = Reading(names, c["P"], list(c["V"]), sum(c["V"]),
                       pct=100 * c["PR"] / c["TP"] if c.get("TP") else None, pct_of="precincts reporting",
@@ -128,7 +130,7 @@ def read_sc(race, src):
             name = re.sub(r"^[A-Z]{3}\s+", "", choice.get("text", ""))
             for vt in choice.iter("VoteType"):
                 for cty in vt.iter("County"):
-                    fips = county_fips("SC", cty.get("name"))
+                    fips = county_fips(race["st"], cty.get("name"))
                     rec = reading.counties.setdefault(fips, {"votes": {}, "total": 0, "pct": pct.get(cty.get("name"))})
                     n = int(cty.get("votes") or 0)
                     rec["votes"][name] = rec["votes"].get(name, 0) + n
@@ -221,7 +223,139 @@ def read_civicapi(race, src):
                    test=bool(d.get("test_data")))
 
 
-READERS = {"nc": read_nc, "sc": read_sc, "fl": read_fl, "tx": read_tx, "civicapi": read_civicapi}
+# ---------- Enhanced Voting (Virginia, Georgia): the "Election Results" CSV report ----------
+SENATE = re.compile(r"\b(united states|u\.?\s?s\.?)\s+senat", re.I)  # "U.S. Senate", "US Senate"; not "State Senate"
+
+
+def read_ev(race, src):
+    """A state on the Enhanced Voting platform (results/public/...): Virginia publishes an
+    "Election Results" CSV (one row per candidate and precinct), Georgia a "Total Votes Excel"
+    workbook (statewide and county sheets). The file name changes with each update, so it is
+    looked up in the election data every time."""
+    import tempfile
+    import urllib.parse
+    import xlsx
+    site, jur, eid = src["site"], src["jurisdiction"], src["election"]
+    office = re.compile(src["office"], re.I) if src.get("office") else SENATE
+    d = json.loads(F.fetch(f"{site}/results/public/api/elections/{jur}/{eid}"))
+    reports = {r.get("reportName"): r["blobName"] for cat in d.get("publicReportCategories") or []
+               for r in cat.get("reports") or []}
+    names, parties, votes, counties = [], [], {}, {}
+
+    def add(name, party, county, n):
+        if name not in votes:
+            names.append(name)
+            parties.append(party)
+            votes[name] = 0
+        votes[name] += n
+        if county is not None:
+            c = counties.setdefault(county_fips(race["st"], county), {"votes": {}, "total": 0, "pct": None})
+            c["votes"][name] = c["votes"].get(name, 0) + n
+            c["total"] += n
+
+    pct = None
+    if "Election Results" in reports:  # Virginia: CSV by precinct
+        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(reports['Election Results'])}"
+        precincts, reported = set(), set()
+        for r in csv.DictReader(io.StringIO(F.fetch(url).decode("utf-8-sig", "replace"))):
+            if not office.search(r["OfficeTitle"] or ""):
+                continue
+            n = int(float(r["TOTAL_VOTES"] or 0))
+            add(r["CandidateName"].strip(), r.get("Party", ""), r["LocalityName"], n)
+            key = (r["LocalityName"], r["PrecinctName"])
+            precincts.add(key)
+            if n:
+                reported.add(key)
+        pct = 100 * len(reported) / len(precincts) if precincts else None
+    elif "Total Votes Excel" in reports:  # Georgia: workbook with a county sheet
+        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(reports['Total Votes Excel'])}"
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
+            tmp.write(F.fetch(url))
+            tmp.flush()
+            rows = list(xlsx.rows(tmp.name, "County Results"))
+        head = rows[0]
+        col = {k: head.index(k) for k in ("County", "Office Name", "Ballot Name", "Party", "Total")}
+        for r in rows[1:]:
+            if not office.search(r[col["Office Name"]] or "") or r[col["Ballot Name"]] in ("Total Votes", "Ballots Cast"):
+                continue
+            name = re.sub(r"\s*\([A-Za-z]+\)$", "", r[col["Ballot Name"]]).strip()
+            add(name, r[col["Party"]], r[col["County"]], int(float(r[col["Total"]] or 0)))
+    else:
+        raise ValueError(f"{jur}: no results report yet")
+    if not names:
+        raise ValueError(f"{jur}: no matching contest in the report yet")
+    return Reading(names, parties, [votes[n] for n in names], sum(votes.values()),
+                   pct=pct, pct_of="precincts with votes" if pct is not None else "",
+                   counties=counties, fetched=_fetched(url), as_of=d.get("asOf"))
+
+
+# ---------- "resultsSW" results sites (South Dakota CSV, Oregon page), statewide only ----------
+def read_sw_csv(race, src):
+    """South Dakota: resultsCSV.aspx, one row per candidate statewide, "precincts reporting" as "N/M"."""
+    rows = list(csv.DictReader(io.StringIO(F.fetch(src["csv"]).decode("utf-8-sig", "replace"))))
+    rows = [r for r in rows if (r.get("RaceName") or "").strip() == src["contest"] and not (r.get("AreaType") or "").strip()]
+    if not rows:
+        raise ValueError(f"no contest {src['contest']!r} in the CSV")
+    names = [" ".join(r["CandidateName"].split()) for r in rows]
+    votes = [int(float(r["CandidateVotes"] or 0)) for r in rows]
+    m = re.search(r"(\d+)\s*/\s*(\d+)", rows[0].get("PrecinctsReporting") or "")
+    return Reading(names, [r["PartyCode"] for r in rows], votes, sum(votes),
+                   pct=100 * int(m.group(1)) / int(m.group(2)) if m and int(m.group(2)) else None,
+                   pct_of="precincts reporting", fetched=_fetched(src["csv"]),
+                   as_of=(rows[0].get("CurrentDateTime") or "").strip() or None)
+
+
+def read_sw_html(race, src):
+    """Oregon: the federal results page; each candidate is an <h1> name, an <h2> party and a vote
+    count, and the contest says "N out of M Precincts Reported"."""
+    page = F.fetch(src["url"]).decode("utf-8", "replace")
+    i = page.find(f"<h1>{src['contest']}</h1>")
+    if i < 0:
+        raise ValueError(f"no contest {src['contest']!r} on the page")
+    j = page.find("display-results-box-a", i + 10)
+    block = page[i:j if j > 0 else None]
+    names, parties, votes = [], [], []
+    for name, party, n in re.findall(r'display-results-box-d">\s*<h1>(.*?)</h1>\s*<h2[^>]*>(.*?)</h2>.*?'
+                                     r'display-results-box-f">\s*<div>([\d,]*)</div>', block, re.S):
+        names.append(" ".join(name.split()))
+        parties.append(party.strip())
+        votes.append(int(n.replace(",", "") or 0))
+    if not names:
+        raise ValueError("no candidates found on the page")
+    m = re.search(r"([\d,]+) out of ([\d,]+) Precincts Reported", block)
+    done, total = (int(x.replace(",", "")) for x in m.groups()) if m else (0, 0)
+    up = re.search(r"Results last updated:\s*([^<]+)", page)
+    return Reading(names, parties, votes, sum(votes), pct=100 * done / total if total else None,
+                   pct_of="precincts reporting", fetched=_fetched(src["url"]),
+                   as_of=up.group(1).strip() if up else None)
+
+
+# ---------- Delaware: statewide and by-county JSON files ----------
+def read_de(race, src):
+    base, eid = src["base"], src["election"]
+    num = lambda x: int(str(x or 0).replace(",", "") or 0)
+    sw = [r for r in json.loads(F.fetch(f"{base}/Election_StatewideResults_ID_{eid}.json")) if r.get("Contest Title") == src["contest"]]
+    if not sw:
+        raise ValueError(f"DE: no contest {src['contest']!r}")
+    names = [" ".join(r["Candidate Name"].split()).title() for r in sw]
+    votes = [num(r["Total Votes"]) for r in sw]
+    counties = {}
+    for r in json.loads(F.fetch(f"{base}/Election_ByCountyWithWilmington_ID_{eid}.json")):
+        if r.get("Contest Title") != src["contest"]:
+            continue
+        name = " ".join(r["Candidate Name"].split()).title()
+        for county in ("New Castle", "Kent", "Sussex"):  # Wilmington is part of New Castle
+            c = counties.setdefault(county_fips("DE", county), {"votes": {}, "total": 0, "pct": None})
+            c["votes"][name] = c["votes"].get(name, 0) + num(r.get(county))
+            c["total"] += num(r.get(county))
+    total_p, done_p = sw[0].get("Total Precincts") or 0, sw[0].get("Precincts Reported") or 0
+    return Reading(names, [r.get("Party Name", "") for r in sw], votes, sum(votes),
+                   pct=100 * done_p / total_p if total_p else None, pct_of="precincts reporting",
+                   counties=counties, fetched=_fetched(f"{base}/Election_StatewideResults_ID_{eid}.json"),
+                   as_of=sw[0].get("ReportTime"))
+
+
+READERS = {"de": read_de, "sw_csv": read_sw_csv, "sw_html": read_sw_html, "nc": read_nc, "clarity": read_clarity, "fl": read_fl, "tx": read_tx, "ev": read_ev, "civicapi": read_civicapi}
 
 
 # ---------- replay: 2024 presidential county results, revealed bit by bit (for testing) ----------
