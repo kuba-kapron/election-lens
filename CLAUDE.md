@@ -38,7 +38,10 @@ pipeline/build_photos.py     photos/ originals -> web/img/candidates/*.jpg + pho
                              photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
 pipeline/fetch_congress.sh   FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
 pipeline/fetch_portraits.py  official portraits of candidates who served -> photos/congress/
-pipeline/build_house_geo.sh  district shapes -> web/data/house/<year>.json (mapshaper)
+pipeline/build_house_geo.sh  district shapes -> web/data/house/plans-<year>.json + plans.json:
+                             each state's map stored once (the year it first appeared), the
+                             index says which file each state uses per election (mapshaper;
+                             changed states measured by pipeline/house_plans.py)
 pipeline/build_senate.py     -> web/data/senate.json (statewide, counties, seat history)
 pipeline/build_house.py      -> web/data/house.json (435 districts per year)
 pipeline/congress.py, xlsx.py  shared readers: FEC spreadsheets, Clerk PDF text (pypdf)

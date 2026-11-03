@@ -33,7 +33,7 @@ Senate and House (needs mapshaper too; one file needs a manual download, see the
 
 ```
 ./pipeline/fetch_congress.sh        # FEC, Clerk of the House, MEDSL, Census -> data/raw/congress/
-./pipeline/build_house_geo.sh       # district shapes -> web/data/house/<year>.json
+./pipeline/build_house_geo.sh       # district shapes -> web/data/house/plans-<year>.json + plans.json
 uv run pipeline/build_senate.py     # -> web/data/senate.json
 uv run pipeline/build_house.py      # -> web/data/house.json
 uv run pipeline/fetch_portraits.py  # official portraits of members of Congress -> photos/congress/

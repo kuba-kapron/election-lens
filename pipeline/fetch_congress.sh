@@ -6,7 +6,8 @@
 #   Clerk of the House, "Statistics of the ... Election", 2020, 2022, 2024 (PDF)
 #   MEDSL (Harvard Dataverse, CC0): Senate statewide 1976-2024; Senate precinct returns
 #     2022 and 2024; House precinct returns 2024
-#   Census cartographic boundary files: congressional districts, 116th, 118th, 119th Congress
+#   Census cartographic boundary files: congressional districts, 116th, 118th, 119th Congress;
+#     TIGER/Line 2026 120th Congress districts for the nine states with new 2026 maps
 #   NC General Assembly: 2019 congressional map (Session Law 2019-249), used in 2020
 #   unitedstates/congress-legislators (public domain): every member of Congress with their
 #     Congress (bioguide) ID, used to find official portraits (pipeline/fetch_portraits.py)
@@ -45,6 +46,11 @@ for f in GENZ2020/shp/cb_2020_us_cd116_500k GENZ2022/shp/cb_2022_us_cd118_500k G
   name=$(basename "$f")
   get "https://www2.census.gov/geo/tiger/$f.zip" "$RAW/shapes/$name.zip"
   unzip -o -q "$RAW/shapes/$name.zip" -d "$RAW/shapes/$name"
+done
+# 2026: the nine states that drew new maps (120th Congress, TIGER/Line 2026); the rest use 2024's
+mkdir -p "$RAW/shapes/cd120"
+for st in 01 06 12 22 37 39 47 48 49; do
+  get "https://www2.census.gov/geo/tiger/TIGER2026/CD/tl_2026_${st}_cd120.zip" "$RAW/shapes/cd120/tl_2026_${st}_cd120.zip"
 done
 get "https://services5.arcgis.com/gRcZqepTaRC6tVZL/arcgis/rest/services/NCGA_Congress_2019/FeatureServer/0/query?where=1%3D1&outFields=*&outSR=4326&f=geojson" \
   "$RAW/shapes/nc_congress_2019.geojson"

@@ -15,7 +15,7 @@
   const photos = new Set(photoList);
 
   // Senate and House data (and each year's district shapes) load the first time they are shown
-  const extra = { senate: null, house: null, live: null, districts: {} };
+  const extra = { senate: null, house: null, live: null, districts: {}, plans: null, planFiles: {} };
   // election night: web/data/live.json, written every minute by pipeline/live.py
   async function loadLive() {
     let d = null;
@@ -30,8 +30,16 @@
     if (office === "senate" && !extra.senate) extra.senate = await d3.json("data/senate.json");
     if (office === "house" && !extra.house) extra.house = await d3.json("data/house.json");
     if (office === "house" && year && !extra.districts[year]) {
-      const t = await d3.json(`data/house/${year}.json`);
-      extra.districts[year] = topojson.feature(t, t.objects.districts).features;
+      // each state's map is stored once, in the file of the year it first appeared;
+      // plans.json says which file each state uses in each election
+      extra.plans = extra.plans || await d3.json("data/house/plans.json");
+      const use = extra.plans[String(year)];
+      const need = [...new Set(Object.values(use))];
+      await Promise.all(need.filter(py => !extra.planFiles[py]).map(async py => {
+        const t = await d3.json(`data/house/plans-${py}.json`);
+        extra.planFiles[py] = topojson.feature(t, t.objects.districts).features;
+      }));
+      extra.districts[year] = need.flatMap(py => extra.planFiles[py].filter(f => use[f.properties.st] === py));
     }
   }
   // Year first, then the race: every year we have, and which races each year has.
