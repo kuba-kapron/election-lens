@@ -20,6 +20,10 @@ US presidential results 2000–2024 on one static page (`web/`):
 - Side panel: results with candidate portraits (or initials), full names, winner checkmark
   and bold, margin history chart. Tooltips with share bars (Margin) or a compact shift line.
 - Light/dark toggle (follows the system until clicked, then remembered in localStorage).
+- Navigation is year first, then race: one ribbon with every year we have (2000–2026), then
+  President | Senate | House | Governor below it; races without data that year are greyed out
+  with the reason on hover. Switching years keeps the race when that year has it, else
+  President, else Senate (decided with the owner on 3 November 2026).
 - Shareable links: `#year=2024&view=shift&map=counties&vote=popular&arrows=on&place=48201`.
   Defaults are left out of the link; old `#2024/margin/48201` links still work.
 
@@ -98,26 +102,44 @@ Decided with the owner:
   dates because the FEC's mark is wrong in about 25 places (special-election winners, all of
   Arizona and Nebraska in 2024, open seats in Delaware and Oregon 2024).
 
-## Next: live results, US midterms, 3 November 2026
+## Live results, US midterms, 3 November 2026 (built 3 November)
 
-Polls close from about 01:00 Warsaw time on 4 November. Races to follow live:
+Polls close from about 01:00 Warsaw time on 4 November. Twelve races: Senate in Texas,
+Michigan, Georgia, North Carolina, South Carolina, Florida (special), Louisiana, Mississippi,
+Maine, Ohio (special); governor in Ohio and Texas. Page: year 2026, Senate or Governor
+(`#race=senate&year=2026`; old `#race=live` links still open it).
 
-- Senate: Texas, Michigan, Georgia, North Carolina, South Carolina, Florida, Louisiana,
-  Mississippi, Maine, Ohio
-- Governor: Ohio, Texas
+```
+pipeline/live_races.py   the 12 races: candidates, poll closing times, sources in order
+pipeline/live_sources.py readers: NC (precinct zip), SC (Clarity JSON + county XML),
+                         FL (county extract), TX (statewide HTML), civicAPI (unofficial)
+pipeline/live_fetch.py   polite fetching: every request goes through it
+pipeline/live.py         importer loop -> web/data/live.json (not committed); --replay to test
+pipeline/live_manual.py  numbers or race calls typed in by hand -> data/live/ (not committed)
+LIVE-CHECKLIST.md        what to run and watch on election night
+```
 
-Plan agreed so far (not yet built):
+Rules agreed with the owner:
 
-1. Inspect each state's official results site to see whether it publishes a machine-readable
-   file (JSON/CSV/XML). Maine may not publish live statewide results, and its Senate race uses
-   ranked-choice voting.
-2. Hybrid importer: automatic for states with a usable data file, quick manual entry for the
-   rest. Writes `web/data/live.json`; the live page polls it.
-3. Reuse the existing map, panel, colors and portraits for the live page.
-4. Dry run with 2024 results replayed as if live, then a one-page election-night checklist.
-
-Open question: local only, or a public link (GitHub Pages / Cloudflare Pages plus a way to
-publish updates every few minutes)?
+- Polite fetching: at most one request per address every 3 minutes, honest User-Agent
+  ("ElectionLens", no personal details), robots.txt followed, "changed since" requests,
+  back off and stop after refusals, never work around a block.
+- Official state results first; civicAPI (free, attribution required, unofficial: aggregates
+  state/county sites and sometimes local media) as fallback, always labeled; its test data is
+  never shown as real. Manual entries override both and name their source.
+- No race calls of our own: a race is marked won only when entered by hand with who called it.
+- What we found: Louisiana's robots.txt forbids scripts on its results data; Ohio's and
+  Michigan's state sites block all scripts (JavaScript check); Georgia's API is open but its
+  contest data loads through code we did not untangle (check its media export link tonight);
+  Mississippi and Maine have no statewide live results. So LA, GA, OH, MI, MS, ME use civicAPI.
+- Candidate photos for people without an official congressional portrait come from Wikimedia
+  Commons: `find_commons_photos.py` (Wikipedia article infobox -> Commons file page, free
+  licenses only: public domain, CC0, CC BY, CC BY-SA) writes a review sheet; only photos the
+  owner approves are fetched (`fetch_commons_photos.py`) and credited in the footer (author,
+  license with link). Wikimedia's APIs (/w/, /api/) are closed to scripts by robots.txt and
+  its search and image servers rate-limit scripts: go slowly (one request every few seconds).
+- Local first; going public later only needs an upload of live.json (ordinary hosting with
+  SFTP/rsync and no caching of live.json, or the page's ?t= query).
 
 Next after election night: governor results 2020, 2022, 2024 (the owner wants them; decided
 2 November 2026 to build the live page first). Even years only for now (2021/2023 odd-year

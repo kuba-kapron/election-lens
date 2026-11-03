@@ -16,6 +16,7 @@
   --ind: #7d52a8; /* independents who do not caucus with either party, and other parties */
   --grn: #2e8540; /* Green Party */
   --lib: #b08800; /* Libertarian Party */
+  --pending: #c3cad2; /* live: polls closed or closing, no votes yet */
   --neutral: #f1edef;
   --nodata: #dfe3e8;
   --focus: #e0a100;
@@ -37,6 +38,7 @@
     --ind: #a987d8;
   --grn: #4fb36a;
   --lib: #e0b62e;
+  --pending: #3d4855;
     --neutral: #2a2f36;
     --nodata: #252c34;
     --county-line: rgba(17, 22, 28, 0.5);
@@ -56,6 +58,7 @@
   --ind: #a987d8;
   --grn: #4fb36a;
   --lib: #e0b62e;
+  --pending: #3d4855;
   --neutral: #2a2f36;
   --nodata: #252c34;
   --county-line: rgba(17, 22, 28, 0.5);
@@ -222,8 +225,20 @@ h1 {
 .mg.r { color: var(--gop); }
 .mg.i { color: var(--ind); }
 
-/* Office switch above the year ribbon */
-.office { margin-bottom: 12px; }
+/* Race switch below the year ribbon: races without data that year are greyed out */
+.office { margin-top: 12px; }
+.mode button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+/* "Live" next to 2026: grey until the first votes are counted, then a pulsing red dot */
+.years .live-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; vertical-align: 0.3em;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.years .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.years .live-tag.on { color: var(--gop); }
+.years .live-tag.on .live-dot { background: var(--gop); animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gop) 60%, transparent); }
+  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--gop) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gop) 0%, transparent); }
+}
 .years ol { grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr)); }
 
 /* Stage */
@@ -531,6 +546,11 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .masthead, .years, .stage, .colophon { padding-left: 16px; padding-right: 16px; }
   .years .yr { font-size: 16px; }
   .years .who { display: none; }
+  .years ol { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  /* two rows of years: underline the chosen year itself, so the line can't look like it
+     belongs to the year above it */
+  .years button { border-top-color: transparent !important; padding-top: 8px; }
+  .years button[aria-current="true"] .yr { text-decoration: underline 3px; text-underline-offset: 5px; }
   .mode button { padding: 6px 8px; font-size: 13px; }
   .combo { width: 100%; margin-left: 0; }
   .combo input { font-size: 16px; } /* below 16px iOS Safari zooms the page on focus */
@@ -539,3 +559,9 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* election night */
+.test-flag { margin: 0 0 12px; padding: 6px 10px; border-radius: 6px; font-weight: 700; font-size: 13px;
+  background: var(--focus); color: #15202b; display: inline-block; }
+.muted { color: var(--muted); font-weight: 400; }
+.office button { white-space: nowrap; }

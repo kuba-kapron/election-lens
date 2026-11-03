@@ -22,13 +22,14 @@
     <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
   </header>
 
-  <nav class="years" aria-label="Election year">
-    <div class="mode office" role="radiogroup" aria-label="Office">
+  <nav class="years" aria-label="Election year and race">
+    <ol id="year-list"></ol>
+    <div class="mode office" role="radiogroup" aria-label="Race">
       <button type="button" role="radio" aria-checked="true" data-office="president">President</button>
       <button type="button" role="radio" aria-checked="false" data-office="senate">Senate</button>
       <button type="button" role="radio" aria-checked="false" data-office="house">House</button>
+      <button type="button" role="radio" aria-checked="false" data-office="governor">Governor</button>
     </div>
-    <ol id="year-list"></ol>
   </nav>
 
   <main class="stage">
@@ -57,8 +58,14 @@
   </main>
 
   <footer class="colophon">
-    <p>President: 2000–2016 official county returns from the <a href="https://github.com/MEDSL/county-returns">MIT Election Data and Science Lab</a>; 2020–2024 county results compiled by <a href="https://github.com/tonmcg/US_County_Level_Election_Results_08-24">Tony McGovern</a>. Alaska is shown statewide. Connecticut reports 2024 presidential results by planning region.</p>
-    <p>Senate and House: certified results from the <a href="https://www.fec.gov/introduction-campaign-finance/election-results-and-voting-information/">Federal Election Commission</a> (2020, 2022) and the <a href="https://clerk.house.gov/Members/ElectionInformation">Clerk of the House</a> (2024), checked against each other; Senate county figures from the <a href="https://electionlab.mit.edu/data">MIT Election Data and Science Lab</a> precinct returns; district maps from the US Census Bureau and the North Carolina General Assembly.</p>
+    <!-- data-src: the views a line belongs to (president, senate, house, live); lines without it always show -->
+    <p data-src="president">President: 2000–2016 official county returns from the <a href="https://github.com/MEDSL/county-returns">MIT Election Data and Science Lab</a>; 2020–2024 county results compiled by <a href="https://github.com/tonmcg/US_County_Level_Election_Results_08-24">Tony McGovern</a>. Alaska is shown statewide. Connecticut reports 2024 presidential results by planning region.</p>
+    <p data-src="senate house">Senate and House: certified results from the <a href="https://www.fec.gov/introduction-campaign-finance/election-results-and-voting-information/">Federal Election Commission</a> (2020, 2022) and the <a href="https://clerk.house.gov/Members/ElectionInformation">Clerk of the House</a> (2024), checked against each other.</p>
+    <p data-src="senate">Senate county figures: precinct returns from the <a href="https://electionlab.mit.edu/data">MIT Election Data and Science Lab</a>.</p>
+    <p data-src="house">District maps: US Census Bureau; North Carolina's 2020 map from the North Carolina General Assembly.</p>
+    <p data-src="live">2026 results, live: official results from the North Carolina State Board of Elections, South Carolina Election Commission, Florida Division of Elections and Texas Secretary of State; unofficial counts from <a href="https://civicapi.org/">civicAPI</a> where states do not publish live data; entries typed in by hand name their source.</p>
+    <p data-src="live" id="photo-credits"></p>
+    <p data-src="senate house live">Portraits of members of Congress: official portraits (public domain) via <a href="https://github.com/unitedstates/images">unitedstates/images</a>.</p>
     <p>Party icons from Wikimedia Commons: Democratic and Republican public domain; <a href="https://commons.wikimedia.org/wiki/File:Libertarian_Disc.svg">Libertarian</a> by Hdebug (original by Lance W. Haverkamp) and <a href="https://commons.wikimedia.org/wiki/File:Green_Disc.svg">Green</a> by Gappalachia, both <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</p>
     <p>Election Lens is open source under the AGPL-3.0 license.</p>
   </footer>
