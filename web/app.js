@@ -26,7 +26,7 @@
     let d = null;
     try { d = await d3.json(`data/live/${office}.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
     extra.live = extra.live || {};
-    extra.live[office] = { races: d?.races || {}, notUp: d?.not_up || null, updated: d?.updated || null };
+    extra.live[office] = { races: d?.races || {}, notUp: d?.not_up || null, updated: d?.updated || null, trailUpdated: d?.trail_updated || null };
     if (d?.night) extra.live.night = d.night;
   }
   const liveFile = (o = state.office) => extra.live?.[liveOffice(o)];
@@ -1186,7 +1186,7 @@
     return `<h3>Last time for this seat</h3><ul class="race-list"><li><button type="button" data-prev-year="${p.year}" data-prev-seat="${p.seat}">
       <span class="what">${p.year}${p.seat === "special" ? " sp." : ""}</span><span class="who">${w.name}${partyTag(w)}</span>${leanLabel(l)}</button></li></ul>`;
   }
-  function liveRaceBody(r) {
+  function liveRaceBody(r, id = r.id) {
     let html = r.test ? `<p class="test-flag">Test data, not real results</p>` : "";
     if (!counted(r)) {
       html += `<div class="cand">${r.cands.map(c => personRow(c, 0, 0, false)).join("")}</div><p class="summary">${liveStatus(r)}.</p>`;
@@ -1197,6 +1197,7 @@
       const sum = called ? `${r.cands[0].name} won. Called by ${r.call.by} at ${clock(r.call.at)}.`
         : `${lead.name} leads ${byText(l)}.`;
       html += `<p class="summary">${sum} ${pctText(r) ? pctText(r) + "." : ""} ${fmtInt(rd.total)} votes counted.</p>`;
+      html += `<div class="trail" data-trail="${id}"></div>`;
     }
     return html + liveSource(r) + livePrev(r);
   }
@@ -1307,7 +1308,107 @@
       state.seat = b.dataset.prevSeat;
       setYear(+b.dataset.prevYear);
     }));
+    fillTrail();
   }
+  // ---------- the race through the night (web/data/live/trail-<office>.json) ----------
+  // Loaded only when a race panel is open, and again only when the office file says the chart
+  // file changed. Points are the source's updates as reported: a step line, no smoothing and
+  // no projection; a change of source is marked.
+  const trails = {};
+  async function fillTrail() {
+    const el = panel.querySelector(".trail[data-trail]");
+    if (!el) return;
+    const office = liveOffice(state.office), want = liveFile(office)?.trailUpdated;
+    if (!want) return;
+    if (trails[office]?.updated !== want) {
+      try { trails[office] = await d3.json(`data/live/trail-${office}.json?t=${encodeURIComponent(want)}`); } catch (e) { return; }
+    }
+    const now = panel.querySelector(`.trail[data-trail="${el.dataset.trail}"]`);  // the panel may have been redrawn meanwhile
+    const tr = trails[office]?.races?.[el.dataset.trail];
+    if (now && tr && tr.pts.length) {
+      now.innerHTML = trailChart(tr, el.dataset.trail);
+      trailHover(now);
+    }
+  }
+  // hover (or touch): a marker on the nearest update and a small box with its numbers
+  let trailInfo = null;
+  function trailHover(el) {
+    const info = trailInfo, svg = el.querySelector("svg"), tip = el.querySelector(".trail-tip"), mark = el.querySelector(".mark");
+    if (!info || !svg || !tip || !mark) return;
+    const hide = () => { tip.hidden = true; mark.setAttribute("visibility", "hidden"); };
+    svg.addEventListener("pointerleave", hide);
+    svg.addEventListener("pointermove", ev => {
+      const box = svg.getBoundingClientRect(), k = info.w / box.width;
+      const t = info.x.invert((ev.clientX - box.left) * k);
+      const i = Math.max(0, d3.bisector(p => p.t).right(info.pts, +t) - 1), p = info.pts[i];
+      const px = info.x(p.t), py = info.y(Math.max(-info.M, Math.min(info.M, p.m)));
+      mark.setAttribute("visibility", "visible");
+      mark.querySelector("line").setAttribute("x1", px);
+      mark.querySelector("line").setAttribute("x2", px);
+      mark.querySelector("circle").setAttribute("cx", px);
+      mark.querySelector("circle").setAttribute("cy", py);
+      const lead = p.m >= 0 ? info.ca : info.cb;
+      tip.innerHTML = `<strong>${clock(new Date(p.t).toISOString())}</strong>
+        <span><span style="color:${candFill(lead)};font-weight:700">${lead.last || lead.name}</span> +${Math.abs(p.m).toFixed(1)}</span>
+        <span class="tip-note">${p.pct != null ? `${Math.round(p.pct)}% counted · ` : ""}${fmtInt(p.total)} votes</span>
+        <span class="tip-note">${info.srcs[p.src]}</span>`;
+      tip.hidden = false;
+      tip.style.top = `${svg.offsetTop + svg.offsetHeight + 2}px`;  // under the chart, not over the line
+      // keep the box inside the chart: left of the marker on the right half
+      const left = px / k, right = px / k > box.width / 2;
+      tip.style.left = right ? "" : `${left + 10}px`;
+      tip.style.right = right ? `${box.width - left + 10}px` : "";
+    });
+  }
+  function trailChart(tr, id) {
+    const race = Object.values(liveFile()?.races || {}).find(x => x.id === id) || liveFile()?.races?.[id];
+    const last = tr.pts[tr.pts.length - 1], n = tr.cands.length;
+    const vote = (p, i) => p[4 + i] || 0;
+    // the two candidates ahead in the latest count: the line is the first one's lead over the second
+    const [a, b] = d3.range(n).sort((i, j) => vote(last, j) - vote(last, i));
+    if (b == null) return "";
+    const person = name => race?.cands.find(c => c.name === name) || { name, party: "O", caucus: "I" };
+    const ca = person(tr.cands[a]), cb = person(tr.cands[b]);
+    const pts = tr.pts.map(p => ({ t: p[0] * 1000, m: p[2] ? 100 * (vote(p, a) - vote(p, b)) / p[2] : 0, src: p[3], total: p[2], pct: p[1] }));
+    const w = 300, h = 150, left = 4, right = 34, top = 14, bottom = 20;
+    const t1 = Math.max(pts[pts.length - 1].t, Math.min(Date.now(), pts[pts.length - 1].t + 6 * 3600e3));
+    const x = d3.scaleTime().domain([pts[0].t, Math.max(t1, pts[0].t + 30 * 60e3)]).range([left, w - right]);
+    // scale to the count once 5% of the latest total is in: the first few counties are often
+    // lopsided and would flatten the rest of the night; earlier points run off the chart (clipped)
+    const settled = pts.filter(p => p.total >= 0.05 * pts[pts.length - 1].total);
+    const M = Math.max(2, Math.ceil(d3.max(settled.length ? settled : pts, p => Math.abs(p.m)) * 1.15));
+    const y = d3.scaleLinear().domain([-M, M]).range([h - bottom, top]);
+    // hold the last count until now (not into the future)
+    const end = Math.min(Date.now(), +x.domain()[1]);
+    const steps = end > pts[pts.length - 1].t ? pts.concat([{ ...pts[pts.length - 1], t: end }]) : pts;
+    const line = d3.line().x(p => x(p.t)).y(p => y(p.m)).curve(d3.curveStepAfter)(steps);
+    const area = d3.area().x(p => x(p.t)).y0(y(0)).y1(p => y(p.m)).curve(d3.curveStepAfter)(steps);
+    const cid = `tc-${id}`.replace(/[^\w-]/g, "");
+    const switches = pts.filter((p, i) => i && p.src !== pts[i - 1].src).map(p =>
+      `<line class="src" x1="${x(p.t)}" x2="${x(p.t)}" y1="${top - 4}" y2="${h - bottom}"><title>From here: ${tr.srcs[p.src]}</title></line>`).join("");
+    const ticks = x.ticks(4).map(t => `<text x="${x(t)}" y="${h - 5}" text-anchor="middle">${clock(t.toISOString())}</text>`).join("");
+    trailInfo = { pts, x, y, M, w, ca, cb, srcs: tr.srcs };
+    const last2 = (s, c) => `<tspan fill="${candFill(c)}" font-weight="700">${c.last || c.name}</tspan>${s}`;
+    return `<h3>Through the night</h3>
+      <svg class="history trail-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${ca.name}'s lead over ${cb.name} as the votes were counted">
+        <defs><clipPath id="${cid}-up"><rect x="0" y="${top}" width="${w}" height="${y(0) - top}"/></clipPath>
+          <clipPath id="${cid}-dn"><rect x="0" y="${y(0)}" width="${w}" height="${h - bottom - y(0)}"/></clipPath>
+          <clipPath id="${cid}-in"><rect x="0" y="${top}" width="${w}" height="${h - bottom - top}"/></clipPath></defs>
+        <path d="${area}" fill="${candFill(ca)}" opacity="0.18" clip-path="url(#${cid}-up)"/>
+        <path d="${area}" fill="${candFill(cb)}" opacity="0.18" clip-path="url(#${cid}-dn)"/>
+        <line class="zero" x1="${left}" x2="${w - right}" y1="${y(0)}" y2="${y(0)}"/>
+        ${switches}
+        <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" clip-path="url(#${cid}-in)"/>
+        <text x="${left}" y="${top - 3}">${last2(" ahead", ca)}</text>
+        <text x="${left}" y="${h - bottom - 4}">${last2(" ahead", cb)}</text>
+        <text x="${w - right + 4}" y="${y(M) + 8}">+${M}</text><text x="${w - right + 4}" y="${y(0) + 4}">0</text><text x="${w - right + 4}" y="${y(-M)}">+${M}</text>
+        ${ticks}
+        <g class="mark" visibility="hidden"><line y1="${top}" y2="${h - bottom}"/><circle r="3.5"/></g>
+        <rect x="${left}" y="0" width="${w - left - right}" height="${h}" fill="transparent"/>
+      </svg><div class="tip trail-tip" hidden></div>
+      <p class="note">${ca.last || ca.name}'s lead over ${cb.last || cb.name}, in points of the votes counted so far, each time the source updated (your time zone).${switches ? " Dashed line: a change of source." : ""}${trails[liveOffice(state.office)]?.test ? " Test data." : ""}</p>`;
+  }
+
   // ---------- live House: 435 races, leaders only (no calls) ----------
   function liveHouseTally(races) {
     const t = { D: 0, R: 0, I: 0, none: 0 };
@@ -1333,7 +1434,7 @@
       html = `<h2>United States</h2><p class="where">House, election night, 3 November 2026</p>` + liveHouseNationBody();
     } else if (s.type === "district" || atLarge(st)) {
       const id = s.type === "district" ? s.id : `${st}-00`, r = races[id];
-      html = `<h2>${districtName(id)}</h2><p class="where">House, 2026</p>` + (r ? liveRaceBody(r) + notesList(r.notes) : `<p class="empty">No result.</p>`);
+      html = `<h2>${districtName(id)}</h2><p class="where">House, 2026</p>` + (r ? liveRaceBody(r, id) + notesList(r.notes) : `<p class="empty">No result.</p>`);
     } else {
       const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-")).sort();
       const t = liveHouseTally(ds.map(([, r]) => r));
@@ -1356,6 +1457,7 @@
       select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
     panel.querySelectorAll("[data-dist]").forEach(b => b.addEventListener("click", () => select({ type: "district", id: b.dataset.dist }, true)));
     panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => setYear(+b.dataset.prevYear)));
+    fillTrail();
   }
 
   // re-read the results file every 30 seconds; redraw only when it changed

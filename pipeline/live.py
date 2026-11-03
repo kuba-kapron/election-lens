@@ -29,6 +29,7 @@ import live_fetch as F
 import live_house as LH
 import live_races as LR
 import live_sources as S
+import live_trail as T
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "web" / "data" / "live"  # one file per office
@@ -336,7 +337,7 @@ _last_snapshot = {}
 def _no_times(x):
     """The data without fetch times, to tell a round that changed numbers from one that did not."""
     if isinstance(x, dict):
-        return {k: _no_times(v) for k, v in x.items() if k not in ("updated", "fetched", "as_of")}
+        return {k: _no_times(v) for k, v in x.items() if k not in ("updated", "fetched", "as_of", "trail_updated")}
     if isinstance(x, list):
         return [_no_times(v) for v in x]
     return x
@@ -362,7 +363,7 @@ def _has_votes(r):
     return bool(r.get("rounds") and r["rounds"][0].get("total"))
 
 
-def write(races, house_races, senate_not_up, keep=False):
+def write(races, house_races, senate_not_up, keep=False, trails=None):
     """One file per office, each written whole and then moved into place."""
     OUT.mkdir(parents=True, exist_ok=True)
     now = iso(time.time())
@@ -379,6 +380,13 @@ def write(races, house_races, senate_not_up, keep=False):
         data = {"office": office, "year": 2026, "updated": now, "races": by_office[office], "night": night}
         if office == "senate":
             data["not_up"] = senate_not_up
+        if trails:  # the race charts: tell the page when its chart file last changed
+            try:
+                trails[office].add(data, time.time())
+                trails[office].write(OUT)
+            except OSError as e:
+                print(f"trail: could not write trail-{office}.json: {e}")
+            data["trail_updated"] = trails[office].updated
         text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
         tmp = OUT / f"{office}.json.tmp"
         tmp.write_text(text)
@@ -401,6 +409,12 @@ def main():
     started = time.time()
     if not args.replay:  # keep earlier versions of the sources too (pipeline/live_fetch.py)
         F.ARCHIVE = ROOT / "data" / "raw" / "live" / "archive"
+    OUT.mkdir(parents=True, exist_ok=True)
+    trails = {o: T.Trail(o, test=bool(args.replay)) for o in OFFICES}
+    for o, tr in trails.items():
+        if not args.replay:
+            tr.load_snapshots(SNAPSHOTS / o)  # a restart picks up the night so far
+        tr.write(OUT)
     while True:
         manual, calls = load(MANUAL), load(CALLS)
         races = []
@@ -412,7 +426,7 @@ def main():
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"
             print(f"{time.strftime('%H:%M:%S')} {race['id']:7} {(r.get('source') or {}).get('kind') or 'none':9} {pct:>4}  {lead}"
                   + (f"   [{'; '.join(errors)}]" if errors else ""), flush=True)
-        write(races, {} if args.replay else house(args, started, history, plans), held, keep=not args.replay)
+        write(races, {} if args.replay else house(args, started, history, plans), held, keep=not args.replay, trails=trails)
         if args.once:
             return 0
         time.sleep(args.every)

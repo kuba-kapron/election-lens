@@ -192,6 +192,15 @@ Rules agreed with the owner:
   {"office", "year", "updated", "races": {id: race}, "night"}; ids "GA-sen", "TX-gov", "13-05".
   The Senate file also has "not_up" (the balance); "night" (any votes yet, Senate calls) is
   repeated in every file for the year ribbon.
+- Race charts ("Through the night", added 3 November): web/data/live/trail-<office>.json, built by
+  pipeline/live_trail.py from the snapshots when the importer starts (a restart loses nothing)
+  and extended every round. Per race: candidates in first-seen order, sources, and points
+  [unix time, % counted, total, source index, votes...], added only when the numbers change and
+  once there are votes. Votes, not margins; numbers as reported. The page loads a chart file only
+  when a race panel is open, and again only when the office file's "trail_updated" changes. Step
+  line of the leader's lead over the runner-up, scaled to the count from 5% of the latest total
+  (earlier lopsided counts are clipped), dashed line at a change of source, hover box with the
+  numbers. --replay charts its test data, marked; a real run rebuilds the files from snapshots.
 - Local first; going public later only needs an upload of web/data/live/ (ordinary hosting with
   SFTP/rsync and no caching of those files, or the page's ?t= query).
 

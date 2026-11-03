@@ -509,6 +509,12 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .history text { font-size: 11px; fill: var(--muted); font-family: inherit; }
 .history .zero { stroke: var(--rule); }
 .history .cur { fill: var(--ink); font-weight: 700; }
+.trail-chart .src { stroke: var(--muted); stroke-dasharray: 3 3; }
+.trail { position: relative; }
+.trail-chart { touch-action: pan-y; }
+.trail-chart .mark line { stroke: var(--muted); }
+.trail-chart .mark circle { fill: var(--ink); }
+.trail-tip { white-space: nowrap; }
 
 .panel .actions { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 
