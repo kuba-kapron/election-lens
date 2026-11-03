@@ -16,16 +16,23 @@
 
   // Senate and House data (and each year's district shapes) load the first time they are shown
   const extra = { senate: null, house: null, live: null, districts: {}, plans: null, planFiles: {} };
-  // election night: web/data/live.json, written every minute by pipeline/live.py
-  async function loadLive() {
+  // election night: web/data/live/<office>.json (senate, governor, house), written every minute
+  // by pipeline/live.py; only the office being viewed is loaded and re-read. Each file carries
+  // the same "night" summary (any votes yet, Senate calls) for the year ribbon.
+  const LIVE_OFFICES = ["senate", "governor", "house"];
+  const liveOffice = o => (LIVE_OFFICES.includes(o) ? o : "senate");
+  async function loadLive(office) {
+    office = liveOffice(office);
     let d = null;
-    try { d = await d3.json(`data/live.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
-    extra.live = { races: { [LIVE_YEAR]: d ? d.races : [] }, house: d?.house || {}, notUp: d?.senate_not_up || null,
-      updated: d ? d.updated : null };
+    try { d = await d3.json(`data/live/${office}.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
+    extra.live = extra.live || {};
+    extra.live[office] = { races: d?.races || {}, notUp: d?.not_up || null, updated: d?.updated || null };
+    if (d?.night) extra.live.night = d.night;
   }
+  const liveFile = (o = state.office) => extra.live?.[liveOffice(o)];
   async function ensureData(office, year) {
     if (+year === LIVE_YEAR) {
-      if (!extra.live) await loadLive();
+      if (!liveFile(office)) await loadLive(office);
       if (office !== "house") return;
     }
     if (office === "senate" && !extra.senate) extra.senate = await d3.json("data/senate.json");
@@ -83,7 +90,7 @@
     seat: "regular", round: null, sel: { type: "nation" } };
   readHash(true);
   // the Senate file labels midterm years in the ribbon; the live file labels 2026
-  await Promise.all([ensureData(state.office), ensureData("senate"), loadLive()]);
+  await Promise.all([ensureData(state.office), ensureData("senate"), loadLive(+state.year === LIVE_YEAR ? state.office : "senate")]);
   readHash();
   await ensureData(state.office, state.year);
 
@@ -661,14 +668,14 @@
     return n ? `${st}'s ${ordinal(n)} district` : `${st} at large`;
   }
   // a year's House races: the live file for 2026, house.json for 2020-2024
-  function houseRaces(y) { return (+y === LIVE_YEAR ? extra.live?.house : extra.house?.races[String(y)]) || {}; }
+  function houseRaces(y) { return (+y === LIVE_YEAR ? liveFile("house")?.races : extra.house?.races[String(y)]) || {}; }
   const hRaces = () => houseRaces(state.year);
   // the live page (election night 2026) reuses the Senate views: same race shape, one "year"
   const isLive = () => state.year === LIVE_YEAR;
   const senLike = () => state.office === "senate" || state.office === "governor";
-  const liveRaces = () => (extra.live ? extra.live.races[LIVE_YEAR] : []);
+  const liveRaces = (o = state.office) => Object.values(liveFile(o)?.races || {});
   const sYear = (y = state.year) => (+y === LIVE_YEAR
-    ? liveRaces().filter(r => r.office === (state.office === "governor" ? "governor" : "senate"))
+    ? liveRaces(state.office === "governor" ? "governor" : "senate")
     : (extra.senate?.races[String(y)] || []));
   const SEAT_ORDER = { regular: 0, special: 1, governor: 2 };
   function senateRaces(st, y = state.year) {
@@ -1155,11 +1162,11 @@
       <span class="key">${box(colors.pending)}No votes counted yet</span><span class="key">${box(colors.nodata)}No race followed</span>`;
   }
   function liveYearLabel() {
-    const rs = liveRaces(), called = { D: 0, R: 0, I: 0 };
-    rs.filter(r => r.office === "senate" && r.call && r.call.winner != null).forEach(r => called[r.cands[r.call.winner].caucus]++);
+    const night = extra.live?.night, called = night?.senate_calls || { D: 0, R: 0, I: 0 };
     const n = called.D + called.R + called.I;
-    const up = extra.live?.updated ? `updated ${clock(extra.live.updated)}` : "live tonight";
-    const on = rs.some(counted);
+    const upd = liveFile()?.updated || liveFile("senate")?.updated;
+    const up = upd ? `updated ${clock(upd)}` : "live tonight";
+    const on = !!night?.counting;
     const tag = `<span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>`;
     return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""} · ` : ""}${up}</span>`;
   }
@@ -1203,8 +1210,8 @@
   // Senate balance tonight: seats not up (won in 2022/2024, current holder) + called + leading
   function senateBalance() {
     const b = { D: { notUp: 0, called: 0, leading: 0 }, R: { notUp: 0, called: 0, leading: 0 }, I: { notUp: 0, called: 0, leading: 0 }, pending: 0 };
-    for (const x of extra.live.notUp?.seats || []) if (x.party) b[x.party].notUp++;
-    for (const r of liveRaces().filter(r => r.office === "senate")) {
+    for (const x of liveFile("senate")?.notUp?.seats || []) if (x.party) b[x.party].notUp++;
+    for (const r of liveRaces("senate")) {
       if (r.call && r.call.winner != null) b[r.cands[r.call.winner].caucus].called++;
       else if (counted(r)) b[raceLean(r).caucus].leading++;
       else b.pending++;
@@ -1212,7 +1219,8 @@
     return b;
   }
   function senateBalanceBody() {
-    if (!extra.live.notUp) return "";
+    const notUp = liveFile("senate")?.notUp;
+    if (!notUp) return "";
     const b = senateBalance();
     const tot = p => b[p].notUp + b[p].called + b[p].leading;
     const order = (tot("R") > tot("D") ? ["R", "D"] : ["D", "R"]).concat(tot("I") ? ["I"] : []);
@@ -1224,8 +1232,8 @@
         <div class="bar ev-bar stacked" style="--need:${(need || 0) / 100}">${seg(x.notUp + x.called, solid, "Not up or called")}${seg(x.leading, light, "Leading")}${need ? `<i class="need" title="${need} for control"></i>` : ""}</div>
         <span class="votes">${x.notUp} not up · ${x.called} won · ${x.leading} leading</span></div></div>`;
     };
-    const before = extra.live.notUp.before;
-    const changed = (extra.live.notUp.seats || []).filter(x => x.note);
+    const before = notUp.before;
+    const changed = (notUp.seats || []).filter(x => x.note);
     return `<div class="cand">${order.map(row).join("")}</div>
       <p class="summary">${b.pending ? `${b.pending} of 35 races have no votes counted yet. ` : ""}Before tonight: Republicans ${before.R}, Democrats ${before.D}${before.I ? `, others ${before.I}` : ""}.</p>
       <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties. Light bars are leads in the votes counted so far, not wins; a race counts as won only once a news organization has called it.</li>
@@ -1243,7 +1251,7 @@
         <span class="who">${who}${l && !(r.call && r.call.winner != null) ? ` <span class="muted">· ${pctText(r).replace(/ of .*| counted/, "")}</span>` : ""}</span>${l ? leanLabel(l) : ""}</button></li>`;
     });
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${extra.live.updated ? `Updated ${clock(extra.live.updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
+    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${liveFile()?.updated ? `Updated ${clock(liveFile().updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
       <ul class="race-list">${items.join("")}</ul>`;
   }
   // footer: name the official sources the live results come from right now
@@ -1316,7 +1324,7 @@
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
     return `${test}<div class="cand">${row("D", t.D)}${row("R", t.R)}</div>
       <p class="summary">${t.none ? `${t.none} districts have no votes counted yet. ` : ""}${t.I ? `Other candidates lead in ${t.I}. ` : ""}A majority needs 218 seats.</p>
-      <p class="note">Leading means ahead in the votes counted so far, not won. House races are not marked as called here. Counts: civicAPI (unofficial).</p>`;
+      <p class="note">Leading means ahead in the votes counted so far, not won. House races are not marked as called here. Counts: official state results where the state publishes them, else civicAPI (unofficial); each district names its source.</p>`;
   }
   function drawLiveHousePanel() {
     const s = state.sel, st = stateOf(s), races = hRaces();
@@ -1353,9 +1361,9 @@
   // re-read the results file every 30 seconds; redraw only when it changed
   setInterval(async () => {
     if (!isLive()) return;
-    const before = extra.live && extra.live.updated;
-    await loadLive();
-    if (extra.live.updated !== before) { drawYears(); drawMap(); drawPanel(); }
+    const before = liveFile()?.updated;
+    await loadLive(state.office);
+    if (liveFile()?.updated !== before) { drawYears(); drawMap(); drawPanel(); }
   }, 30000);
 
   // ---------- state finder: type to narrow the list (combobox) ----------

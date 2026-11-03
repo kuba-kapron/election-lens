@@ -100,7 +100,8 @@ def commons_info(file):
 
 
 def main():
-    live = json.loads((ROOT / "web/data/live.json").read_text())
+    live = {"races": [r for o in ("senate", "governor")  # tonight's Senate and governor candidates
+                      for r in json.loads((ROOT / f"web/data/live/{o}.json").read_text())["races"].values()]}
     congress = set(json.loads((ROOT / "web/img/congress/congress.json").read_text()))
     OUT.mkdir(parents=True, exist_ok=True)
     abbr = {v: k for k, v in {s: f for f, s in []}.items()}

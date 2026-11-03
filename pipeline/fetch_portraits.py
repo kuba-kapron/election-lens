@@ -31,9 +31,8 @@ def congress_ids():
         for races in data["races"].values():
             for race in races.values() if isinstance(races, dict) else races:
                 ids.update(c["bio"] for c in race["cands"] if "bio" in c)
-    live = ROOT / "web" / "data" / "live.json"  # tonight's candidates, written by pipeline/live.py
-    if live.exists():
-        for race in json.loads(live.read_text())["races"]:
+    for live in sorted((ROOT / "web" / "data" / "live").glob("*.json")):  # tonight's candidates (pipeline/live.py)
+        for race in json.loads(live.read_text())["races"].values():
             ids.update(c["bio"] for c in race["cands"] if "bio" in c)
     return sorted(ids)
 

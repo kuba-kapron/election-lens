@@ -120,7 +120,8 @@ pipeline/live_sources.py readers: NC (precinct zip), Clarity (SC, IA: JSON + cou
                          FL (county extract), TX (statewide HTML), Enhanced Voting (GA, VA,
                          RI: Excel/CSV report), DE (JSON), SD (CSV), OR (page), civicAPI
 pipeline/live_fetch.py   polite fetching: every request goes through it
-pipeline/live.py         importer loop -> web/data/live.json (not committed); --replay to test
+pipeline/live.py         importer loop -> web/data/live/{senate,governor,house}.json (not
+                         committed); --replay to test
 pipeline/live_manual.py  numbers or race calls typed in by hand -> data/live/ (not committed)
 LIVE-CHECKLIST.md        what to run and watch on election night
 ```
@@ -148,7 +149,7 @@ Rules agreed with the owner:
   Clarity's shared domain (results.enr.clarityelections.com, used by CO, WV, AL). Louisiana's
   robots.txt forbids its results data. No statewide live results: MS, ME, NH, MA, NJ, IL, AK
   (PDF summary only), WY, KS. Nebraska's results host does not resolve from here. All of
-  those use civicAPI. The footer names the official sources in use from live.json.
+  those use civicAPI. The footer names the official sources in use in the office being viewed.
 - Candidate photos for people without an official congressional portrait come from Wikimedia
   Commons: `find_commons_photos.py` (Wikipedia article infobox -> Commons file page, free
   licenses only: public domain, CC0, CC BY, CC BY-SA) writes a review sheet; only photos the
@@ -176,7 +177,7 @@ Rules agreed with the owner:
   page, matches the certified 2024 result exactly). Missouri refuses scripts. Tested against certified 2024 House
   results where the site keeps 2024: NC, SC, IA, FL, GA, VA, every contested district within
   0.5%. Florida's file is in the Windows character set (cp1252). Not yet: AZ, RI (report
-  names unknown until published). Written to live.json "house"
+  names unknown until published). Written to web/data/live/house.json,
   keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.
@@ -184,10 +185,15 @@ Rules agreed with the owner:
 - Record of the night (not committed): each changed source file, gzipped, at most one version
   per source every 10 minutes and 1 GB in all (data/raw/live/archive/<key>/<UTC time>.gz, with
   url.txt), so readers can be fixed and the night re-read without asking the sites again; and
-  live.json after every round that changed more than fetch times (data/live/snapshots/, about
-  80 KB each). Not in --replay. Saving never stops the importer.
-- Local first; going public later only needs an upload of live.json (ordinary hosting with
-  SFTP/rsync and no caching of live.json, or the page's ?t= query).
+  each office's file after every round that changed more than fetch times
+  (data/live/snapshots/<office>/, 20-80 KB each). Not in --replay. Saving never stops the importer.
+- Live files, one per office (decided 3 November, so a viewer re-reads only the office in view,
+  every 30 seconds): web/data/live/senate.json, governor.json, house.json, each
+  {"office", "year", "updated", "races": {id: race}, "night"}; ids "GA-sen", "TX-gov", "13-05".
+  The Senate file also has "not_up" (the balance); "night" (any votes yet, Senate calls) is
+  repeated in every file for the year ribbon.
+- Local first; going public later only needs an upload of web/data/live/ (ordinary hosting with
+  SFTP/rsync and no caching of those files, or the page's ?t= query).
 
 Next after election night: governor results 2020, 2022, 2024 (the owner wants them; decided
 2 November 2026 to build the live page first). Even years only for now (2021/2023 odd-year

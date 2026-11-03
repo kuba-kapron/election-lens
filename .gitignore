@@ -5,4 +5,4 @@ node_modules/
 .venv/
 photos/
 data/live/
-web/data/live.json
+web/data/live/

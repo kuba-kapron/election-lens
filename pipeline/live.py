@@ -1,4 +1,8 @@
-"""Live results importer for election night, 3 November 2026. Writes web/data/live.json.
+"""Live results importer for election night, 3 November 2026. Writes web/data/live/<office>.json:
+senate.json, governor.json, house.json, so the page reloads only the office being viewed. Each
+file: {"office", "updated", "races": {id: race}, "night"}; the Senate file also has "not_up"
+(seats not up tonight, for the balance); "night" is the same small summary in every file
+(whether any race has votes, Senate calls) for the year ribbon.
 
     uv run pipeline/live.py              # check every source, rewrite the file, repeat every minute
     uv run pipeline/live.py --once       # one round, then stop
@@ -27,7 +31,7 @@ import live_races as LR
 import live_sources as S
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "web" / "data" / "live.json"
+OUT = ROOT / "web" / "data" / "live"  # one file per office
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
 STALE_AFTER = 10 * 60  # seconds: a source not refreshed for this long is marked stale
@@ -324,8 +328,9 @@ def official_house(races):
     return n
 
 
-SNAPSHOTS = ROOT / "data" / "live" / "snapshots"
-_last_snapshot = {"key": None}
+SNAPSHOTS = ROOT / "data" / "live" / "snapshots"  # <office>/<UTC time>.json.gz
+OFFICES = ("senate", "governor", "house")
+_last_snapshot = {}
 
 
 def _no_times(x):
@@ -337,32 +342,49 @@ def _no_times(x):
     return x
 
 
-def snapshot(data, text):
-    """Keep a gzipped copy of live.json when anything besides fetch times changed:
-    data/live/snapshots/<UTC time>.json.gz, a record of how the night went (not committed).
-    Never raises: the record is a bonus, the live page comes first."""
+def snapshot(office, data, text):
+    """Keep a gzipped copy of an office's file when anything besides fetch times changed:
+    data/live/snapshots/<office>/<UTC time>.json.gz, a record of how the night went (not
+    committed). Never raises: the record is a bonus, the live page comes first."""
     try:
         key = json.dumps(_no_times(data), sort_keys=True)
-        if key == _last_snapshot["key"]:
+        if key == _last_snapshot.get(office):
             return
-        SNAPSHOTS.mkdir(parents=True, exist_ok=True)
-        (SNAPSHOTS / (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".json.gz")).write_bytes(
-            gzip.compress(text.encode(), 6))
-        _last_snapshot["key"] = key
+        d = SNAPSHOTS / office
+        d.mkdir(parents=True, exist_ok=True)
+        (d / (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".json.gz")).write_bytes(gzip.compress(text.encode(), 6))
+        _last_snapshot[office] = key
     except OSError as e:
-        print(f"snapshot: could not keep a copy of live.json: {e}")
+        print(f"snapshot: could not keep a copy of {office}.json: {e}")
+
+
+def _has_votes(r):
+    return bool(r.get("rounds") and r["rounds"][0].get("total"))
 
 
 def write(races, house_races, senate_not_up, keep=False):
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    data = {"updated": iso(time.time()), "year": 2026, "races": races, "house": house_races,
-            "senate_not_up": senate_not_up}
-    text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
-    tmp = OUT.with_suffix(".tmp")
-    tmp.write_text(text)
-    os.replace(tmp, OUT)  # the page never sees a half-written file
-    if keep:
-        snapshot(data, text)
+    """One file per office, each written whole and then moved into place."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    now = iso(time.time())
+    by_office = {o: {} for o in OFFICES}
+    for r in races:
+        by_office[r["office"]][r["id"]] = r
+    by_office["house"] = house_races
+    calls = {"D": 0, "R": 0, "I": 0}
+    for r in by_office["senate"].values():
+        if r.get("call") and r["call"].get("winner") is not None:
+            calls[r["cands"][r["call"]["winner"]]["caucus"]] += 1
+    night = {"counting": any(_has_votes(r) for o in OFFICES for r in by_office[o].values()), "senate_calls": calls}
+    for office in OFFICES:
+        data = {"office": office, "year": 2026, "updated": now, "races": by_office[office], "night": night}
+        if office == "senate":
+            data["not_up"] = senate_not_up
+        text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        tmp = OUT / f"{office}.json.tmp"
+        tmp.write_text(text)
+        os.replace(tmp, OUT / f"{office}.json")  # the page never sees a half-written file
+        if keep:
+            snapshot(office, data, text)
 
 
 def main():
