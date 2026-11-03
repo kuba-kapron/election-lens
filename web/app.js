@@ -1572,9 +1572,9 @@
     } else {
       h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
       dek.textContent = (state.office === "governor"
-        ? "The governor races in Ohio and Texas as the votes are counted."
+        ? "All 36 governor races as the votes are counted."
         : state.office === "house" ? "All 435 House races as the votes are counted, by district, on the 2026 maps (nine states redrew). House counts are unofficial (civicAPI), and House races are shown as leading, not called."
-        : "All 35 Senate races as the votes are counted; the governor races in Ohio and Texas are under Governor.")
+        : "All 35 Senate races as the votes are counted; the 36 governor races are under Governor.")
         + (state.office === "house" ? "" : " Official state results where the state publishes them, otherwise unofficial counts, always labeled.")
         + " Updates every minute; times are in your time zone.";
     }

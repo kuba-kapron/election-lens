@@ -31,6 +31,10 @@ Times are Warsaw time (CET).
 | 05:00 | Idaho, Oregon |
 | 06:00–07:00 | Alaska |
 
+Governor races (36) are under Governor; official results for South Carolina, Iowa, Georgia,
+Florida, Oregon, South Dakota, Rhode Island, Texas, New York, Maryland and Arizona (some only
+once their files fill in), civicAPI for the rest.
+
 Times from CBS News (the moment a state's last polls close). Official state results are read
 for North Carolina, South Carolina, Georgia, Florida, Texas, Virginia, Iowa, Delaware, South
 Dakota, Oregon and Rhode Island; every other race comes from civicAPI (unofficial, labeled on

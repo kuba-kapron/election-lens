@@ -134,8 +134,16 @@ Rules agreed with the owner:
   state/county sites and sometimes local media) as fallback, always labeled; its test data is
   never shown as real. Manual entries override both and name their source.
 - No race calls of our own: a race is marked won only when entered by hand with who called it.
+- Governor races (all 36, added 3 November): official readers where the state has one for the
+  governor contest (SC, IA, GA, FL, OR, SD, RI, TX, NY, MD, AZ), else civicAPI. No governor
+  history yet, so no "last time" comparison.
 - Official live sources (surveyed 3 November, each tested on an earlier election where the
-  site keeps one): NC, SC, FL, TX, GA, VA, IA, DE, SD, OR, RI. Refused or blocked scripts
+  site keeps one): NC, SC, FL, TX, GA, VA, IA, DE, SD, OR, RI; for governor also NY (plain
+  results page), MD (results page), AZ (Enhanced Voting, report not yet published).
+  Also checked: CA (refuses scripts, 403), PA (certificate fails verification; not bypassed),
+  NV (results site needs browser cookies), VT (app, data address not found), HI (media.txt
+  file exists for the primary; the general's file was not published yet), WI and CT (no
+  statewide election-night results). Not checked yet (House only): IN, MO, ND, UT, WA. Refused or blocked scripts
   (403, captcha or JavaScript check): OH, MI, KY, OK, NM, MT, ID, AR, MN (captcha), and
   Clarity's shared domain (results.enr.clarityelections.com, used by CO, WV, AL). Louisiana's
   robots.txt forbids its results data. No statewide live results: MS, ME, NH, MA, NJ, IL, AK

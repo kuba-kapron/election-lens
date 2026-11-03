@@ -151,7 +151,7 @@ def read_fl(race, src):
         raise ValueError("FL: results file not available yet (it opens when polls close)")
     names, parties, votes, counties, prec = [], [], {}, {}, {}
     for r in csv.DictReader(io.StringIO(text), delimiter="\t"):
-        if r["OfficeDesc"] != src["office"]:
+        if not re.fullmatch(src["office"], r["OfficeDesc"]):  # an exact name, or a pattern
             continue
         name = " ".join(x for x in (r["CanNameFirst"], r["CanNameLast"]) if x)
         n = int(r["CanVotes"] or 0)
@@ -269,17 +269,30 @@ def read_ev(race, src):
         pct = 100 * len(reported) / len(precincts) if precincts else None
     elif "Total Votes Excel" in reports:  # Georgia: workbook with a county sheet
         url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(reports['Total Votes Excel'])}"
+        # statewide from "Total Votes"; counties from "County Results" when the workbook has it
+        # (Georgia's 2022 workbook had precinct results instead)
         with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
             tmp.write(F.fetch(url))
             tmp.flush()
-            rows = list(xlsx.rows(tmp.name, "County Results"))
-        head = rows[0]
-        col = {k: head.index(k) for k in ("County", "Office Name", "Ballot Name", "Party", "Total")}
-        for r in rows[1:]:
-            if not office.search(r[col["Office Name"]] or "") or r[col["Ballot Name"]] in ("Total Votes", "Ballots Cast"):
-                continue
-            name = re.sub(r"\s*\([A-Za-z]+\)$", "", r[col["Ballot Name"]]).strip()
-            add(name, r[col["Party"]], r[col["County"]], int(float(r[col["Total"]] or 0)))
+            sheets = xlsx.sheet_names(tmp.name)
+            state_rows = list(xlsx.rows(tmp.name, "Total Votes"))
+            county_rows = list(xlsx.rows(tmp.name, "County Results")) if "County Results" in sheets else []
+        clean = lambda b: re.sub(r"(\s*\([A-Za-z]+\))+$", "", b).strip()  # "Brian Kemp (I) (Rep)" -> "Brian Kemp"
+        skip = ("Total Votes", "Ballots Cast")
+        head = state_rows[0]
+        col = {k: head.index(k) for k in ("Office Name", "Ballot Name", "Party", "Total")}
+        for r in state_rows[1:]:
+            if office.search(r[col["Office Name"]] or "") and r[col["Ballot Name"]] not in skip:
+                add(clean(r[col["Ballot Name"]]), r[col["Party"]], None, int(float(r[col["Total"]] or 0)))
+        if county_rows:
+            head = county_rows[0]
+            col = {k: head.index(k) for k in ("County", "Office Name", "Ballot Name", "Total")}
+            for r in county_rows[1:]:
+                if office.search(r[col["Office Name"]] or "") and r[col["Ballot Name"]] not in skip:
+                    name, n = clean(r[col["Ballot Name"]]), int(float(r[col["Total"]] or 0))
+                    c = counties.setdefault(county_fips(race["st"], r[col["County"]]), {"votes": {}, "total": 0, "pct": None})
+                    c["votes"][name] = c["votes"].get(name, 0) + n
+                    c["total"] += n
     else:
         raise ValueError(f"{jur}: no results report yet")
     if not names:
@@ -355,7 +368,59 @@ def read_de(race, src):
                    as_of=sw[0].get("ReportTime"))
 
 
-READERS = {"de": read_de, "sw_csv": read_sw_csv, "sw_html": read_sw_html, "nc": read_nc, "clarity": read_clarity, "fl": read_fl, "tx": read_tx, "ev": read_ev, "civicapi": read_civicapi}
+# ---------- New York: the plain (no JavaScript) results page ----------
+def read_ny(race, src):
+    """nyenr.elections.ny.gov/HomeNoJS.aspx: one table per contest ("<contest> > All Counties");
+    each candidate starts a row with their name, and that row's last cell is their total over
+    all party lines (New York has fusion voting)."""
+    page = F.fetch(src["url"]).decode("utf-8", "replace")
+    m = re.search(r'<table class="datatable"[^>]*summary="Results for All Counties ' + re.escape(src["contest"]) + r'"(.*?)</table>\s*</td>\s*</tr>\s*</table>|'
+                  r'<table class="datatable"[^>]*summary="Results for All Counties ' + re.escape(src["contest"]) + r'"(.*?)(?=<table class="datatable"|$)', page, re.S)
+    if not m:
+        raise ValueError(f"NY: no contest {src['contest']!r}")
+    block = m.group(1) or m.group(2)
+    rep = re.search(r"Election Districts Reporting:\s*([\d,]+) of ([\d,]+)", block)
+    names, votes = [], []
+    for row in re.findall(r"<tr>(.*?)</tr>", block, re.S):
+        cells = re.findall(r'<td class="([^"]*)"[^>]*>(.*?)</td>', row, re.S)
+        if not cells or cells[0][0] != "resultsColumnData":
+            continue  # header rows and a candidate's extra party lines
+        name = " ".join(re.sub(r"<[^>]+>", "", cells[0][1]).split())
+        if not name or name.lower().startswith(("blank", "void", "scattering")):
+            continue
+        n = re.sub(r"[^\d]", "", re.sub(r"<[^>]+>", "", cells[-1][1]))
+        names.append(name.split(" / ")[0])  # "Kathy C. Hochul / Adrienne E. Adams": the governor
+        votes.append(int(n or 0))
+    if not names:
+        raise ValueError("NY: no candidates found")
+    done, total = (int(x.replace(",", "")) for x in rep.groups()) if rep else (0, 0)
+    return Reading(names, [], votes, sum(votes), pct=100 * done / total if total else None,
+                   pct_of="election districts reporting", fetched=_fetched(src["url"]))
+
+
+# ---------- Maryland: the State Board's results page ----------
+def read_md(race, src):
+    """elections.maryland.gov results page: one row per ticket (name, party, vote types, total,
+    percentage; "NR" = not reported) and "(N of M election day precincts reported)"."""
+    page = F.fetch(src["url"]).decode("utf-8", "replace")
+    names, parties, votes = [], [], []
+    for name, party, cells in re.findall(r"<tr>\s*<td><div>(.*?)</div></td>\s*<td>(.*?)</td>(.*?)</tr>", page, re.S):
+        nums = [re.sub(r"[^\d]", "", x) for x in re.findall(r'<td class="alignRight">(.*?)</td>', cells, re.S)]
+        name = " ".join(re.sub(r"<[^>]+>", "", name).split())
+        if len(nums) < 2 or name.lower().startswith("total"):
+            continue  # the closing "Totals" row would count every vote twice
+        names.append(name.split(" and ")[0])  # "Wes Moore and Aruna Miller": the governor
+        parties.append(party.strip())
+        votes.append(int(nums[-2] or 0))  # Total; the last column is the percentage
+    if not names:
+        raise ValueError("MD: no candidates found")
+    m = re.search(r"\((\d[\d,]*) of (\d[\d,]*) election day precincts reported\)", page)
+    done, total = (int(x.replace(",", "")) for x in m.groups()) if m else (0, 0)
+    return Reading(names, parties, votes, sum(votes), pct=100 * done / total if total else None,
+                   pct_of="election day precincts reporting", fetched=_fetched(src["url"]))
+
+
+READERS = {"md": read_md, "ny": read_ny, "de": read_de, "sw_csv": read_sw_csv, "sw_html": read_sw_html, "nc": read_nc, "clarity": read_clarity, "fl": read_fl, "tx": read_tx, "ev": read_ev, "civicapi": read_civicapi}
 
 
 # ---------- replay: 2024 presidential county results, revealed bit by bit (for testing) ----------
