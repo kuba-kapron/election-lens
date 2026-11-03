@@ -46,6 +46,13 @@ def load(path):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+# everyday first names in candidate lists -> the formal ones in the legislator list
+# (live races only; the 2020-2024 builds keep their tested matching)
+FORMAL = {"Chris": "Christopher", "Jim": "James", "Tom": "Thomas", "Deb": "Debra", "Kathy": "Kathleen",
+          "Mike": "Michael", "Bob": "Robert", "Bill": "William", "Dave": "David", "Joe": "Joseph",
+          "Dan": "Daniel", "Rob": "Robert", "Tim": "Timothy", "Ted": "Edward", "Andy": "Andrew"}
+
+
 def people(race):
     """Candidates as the page shows them, with Congress IDs (portraits) and incumbency."""
     out = []
@@ -53,6 +60,8 @@ def people(race):
         first, last = name.split(" ", 1)[0], LR.last_name(name)
         chamber = "sen" if race["office"] == "senate" else None
         m = C.member(race["st"], first, last, chamber or "sen", 2026)
+        if not m and first in FORMAL:
+            m = C.member(race["st"], FORMAL[first], last, chamber or "sen", 2026)
         p = {"name": name, "last": last, "party": party, "caucus": party if party in ("D", "R") else "I",
              "inc": bool(chamber) and C.sitting(m, chamber, 2026),
              "photo": f"{race['st'].lower()}-{last.lower()}"}  # web/img/people/<photo>.jpg, if approved
