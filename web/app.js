@@ -1309,7 +1309,7 @@
       <p class="summary">${b.pending ? `${b.pending} of 35 races have no votes counted yet. ` : ""}Before tonight: Republicans ${before.R}, Democrats ${before.D}${before.I ? `, others ${before.I}` : ""}.</p>
       <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties. Light bars are leads in the votes counted so far, not wins; a race counts as won only once a news organization has called it.</li>
       <li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
-      <h3>Races tonight</h3>`;
+      <h3>Races</h3>`;
   }
   function liveNationBody() {
     const rs = [...sYear()].sort((a, b) => Date.parse(a.polls_close) - Date.parse(b.polls_close) || data.states[a.st].name.localeCompare(data.states[b.st].name));
@@ -1322,7 +1322,7 @@
         <span class="who">${who}${l && !(r.call && r.call.winner != null) ? ` <span class="muted">· ${pctText(r).replace(/ of .*| counted/, "")}</span>` : ""}</span>${l ? leanLabel(l) : ""}</button></li>`;
     });
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${liveFile()?.updated ? `Updated ${clock(liveFile().updated)}.` : ""} Races are listed by poll closing time. Nobody's call is made here: a race is marked won only when a news organization has called it, and the panel says who.</p>
+    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${liveFile()?.updated ? `Updated ${clock(liveFile().updated)}.` : ""} Listed by poll closing time. A race is marked won only after a news organization calls it.</p>
       <ul class="race-list">${items.join("")}</ul>`;
   }
   // footer: name the official sources the live results come from right now
@@ -1495,7 +1495,7 @@
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
     return `${test}<div class="cand">${row("D", t.D)}${row("R", t.R)}</div>
       <p class="summary">${t.none ? `${t.none} districts have no votes counted yet. ` : ""}${t.I ? `Other candidates lead in ${t.I}. ` : ""}A majority needs 218 seats.</p>
-      <p class="note">Leading means ahead in the votes counted so far, not won. House races are not marked as called here. Counts: official state results where the state publishes them, else civicAPI (unofficial); each district names its source.</p>`;
+      <p class="note">Leading means ahead in the votes counted so far. House races are not marked as called here.</p>`;
   }
   function drawLiveHousePanel() {
     const s = state.sel, st = stateOf(s), races = hRaces();
@@ -1742,21 +1742,19 @@
     const h = document.getElementById("headline"), dek = document.getElementById("dek");
     if (state.office === "president") {
       h.innerHTML = `How America voted, <span class="nowrap">2000 to 2024</span>`;
-      dek.textContent = "Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.";
+      dek.textContent = "Every presidential election since 2000, from the Electoral College down to the county. Click a state to see its counties, and a county to see how it has voted over time.";
     } else if (state.office === "senate" && !isLive()) {
       h.innerHTML = `How America voted for the Senate, <span class="nowrap">2020 to 2024</span>`;
-      dek.textContent = "Every Senate race from 2020 to 2024, statewide and by county. About a third of the seats are up in each election. Click a state to see its counties.";
+      dek.textContent = "Every Senate race in 2020, 2022 and 2024, by state and county. About a third of the Senate is elected every two years.";
     } else if (state.office === "house" && !isLive()) {
       h.innerHTML = `How America voted for the House, <span class="nowrap">2020 to 2024</span>`;
-      dek.textContent = "All 435 House races in 2020, 2022 and 2024, by congressional district. Click a state to zoom in, then click a district.";
+      dek.textContent = "All 435 seats in 2020, 2022 and 2024, district by district.";
     } else {
       h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
-      dek.textContent = (state.office === "governor"
-        ? "All 36 governor races as the votes are counted."
-        : state.office === "house" ? "All 435 House races as the votes are counted, by district, on the 2026 maps (nine states redrew). Official state results where we read them (each district names its source), unofficial counts from civicAPI elsewhere; House races are shown as leading, not called."
-        : "All 35 Senate races as the votes are counted; the 36 governor races are under Governor.")
-        + (state.office === "house" ? "" : " Official state results where the state publishes them, otherwise unofficial counts, always labeled.")
-        + " Updates every minute; times are in your time zone.";
+      dek.textContent = (state.office === "governor" ? "36 states elect a governor."
+        : state.office === "house" ? "All 435 seats, on this year's district maps (nine states drew new ones)."
+        : "35 Senate seats are on the ballot, including special elections in Florida and Ohio.")
+        + " Results from state election offices and civicAPI. Times are in your time zone.";
     }
     document.title = state.office === "president" ? "Election Lens"
       : isLive() ? "Election night 2026 · Election Lens" : `${state.office === "senate" ? "Senate" : "House"} results · Election Lens`;

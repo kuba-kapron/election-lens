@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Election Lens</title>
-  <meta name="description" content="US presidential results from 2000 to 2024 and Senate and House results from 2020 to 2024, from the national result down to every county and district.">
+  <meta name="description" content="US election results from 2000 to 2024, and live results from the 2026 midterms, from the national picture down to every county and district.">
   <script>
     // apply a saved light/dark choice before the page paints
     try { const t = localStorage.getItem("theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
@@ -25,7 +25,7 @@
       <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode"></button>
     </div>
     <h1 id="headline">How America voted, <span class="nowrap">2000 to 2024</span></h1>
-    <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
+    <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to the county. Click a state to see its counties, and a county to see how it has voted over time.</p>
   </header>
 
   <nav class="years" aria-label="Election year">
