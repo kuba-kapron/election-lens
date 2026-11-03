@@ -130,16 +130,18 @@ def read_ev(spec):
             prec.setdefault(dist, set()).add(key)
             if n:
                 rep.setdefault(dist, set()).add(key)
-    elif "Total Votes Excel" in reports:
-        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(reports['Total Votes Excel'])}"
+    elif "Total Votes Excel" in reports or "All Results Excel" in reports:  # Georgia; Utah
+        blob = reports.get("Total Votes Excel") or reports["All Results Excel"]
+        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(blob)}"
         with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
             tmp.write(F.fetch(url))
             tmp.flush()
-            rows = list(xlsx.rows(tmp.name, "Total Votes"))
+            sheets = xlsx.sheet_names(tmp.name)
+            rows = list(xlsx.rows(tmp.name, "Total Votes" if "Total Votes" in sheets else "Summary Results"))
         for r in rows[1:]:
             dist = _dist(spec["pattern"], r[0] or "")
-            if dist is None or r[2] in ("Total Votes", "Ballots Cast"):
-                continue
+            if dist is None or re.fullmatch(r"(total votes|ballots cast|over ?votes|under ?votes)", (r[2] or "").strip(), re.I):
+                continue  # not candidates: totals, and over/under votes (Utah)
             name = re.sub(r"(\s*\([A-Za-z]+\))+$", "", r[2]).strip()
             acc.setdefault(dist, {})
             acc[dist][name] = acc[dist].get(name, 0) + int(float(r[5] or 0))
@@ -195,6 +197,75 @@ def read_ny(spec):
     return out
 
 
+def read_md(spec):
+    """Maryland: one page for all districts, each under <h3>District N</h3> with its own table
+    (name, party, vote types, total, percentage; "NR" = not reported, a closing "Totals" row)."""
+    url = spec["url"]
+    page = F.fetch(url).decode("utf-8", "replace")
+    parts = re.split(r"<h3>District (\d+)</h3>", page)
+    out = {}
+    for num, body in zip(parts[1::2], parts[2::2]):
+        names, votes = [], []
+        for name, party, cells in re.findall(r"<tr>\s*<td><div>(.*?)</div></td>\s*<td>(.*?)</td>(.*?)</tr>", body, re.S):
+            name = " ".join(re.sub(r"<[^>]+>", "", name).split())
+            nums = [re.sub(r"[^\d]", "", x) for x in re.findall(r'<td class="alignRight">(.*?)</td>', cells, re.S)]
+            if len(nums) < 2 or name.lower().startswith("total"):
+                continue  # the "Totals" row would count every vote twice
+            names.append(name)
+            votes.append(int(nums[-2] or 0))
+        m = re.search(r"\((\d[\d,]*) of (\d[\d,]*) election day precincts reported\)", body)
+        done, total = (int(x.replace(",", "")) for x in m.groups()) if m else (0, 0)
+        out[num.zfill(2)] = _reading(names, votes, 100 * done / total if total else None,
+                                     "election day precincts reporting", _fetched(url))
+    return out
+
+
+def read_in(spec):
+    """Indiana: the results app's own JSON files. settings.json names the current version
+    ("A" or "B"); OffCatC_1005_<version>.json holds every US House race with statewide
+    totals per district. No precinct counts, so no share counted."""
+    base = spec["base"]
+    root = lambda b: (lambda j: j.get("Root", j))(json.loads(b.decode("utf-8-sig")))
+    ver = root(F.fetch(f"{base}/settings.json"))["VersionType"]
+    url = f"{base}/OffCatC_1005_{ver}.json"
+    d = root(F.fetch(url))
+    races = d["StatewideSummary"]["Race"]
+    out = {}
+    for r in races if isinstance(races, list) else [races]:
+        dist = _dist(spec["pattern"], r["SubSortOrder"])
+        if dist is None:
+            continue
+        cands = r["Candidates"]["Candidate"]
+        cands = cands if isinstance(cands, list) else [cands]
+        names = [re.sub(r"\s*\(W/I\)$", "", c["NAME_ON_BALLOT"]).strip() for c in cands]
+        out[dist] = _reading(names, [int(c["TOTAL"] or 0) for c in cands], None, "", _fetched(url), d.get("WriteTime"))
+    return out
+
+
+def read_nd(spec):
+    """North Dakota: the statewide results page (same vendor as Oregon, different markup).
+    Before election night the page still shows the last general (2024), so it is read only
+    when its hidden election date is this election's."""
+    url = spec["url"]
+    page = F.fetch(url).decode("utf-8", "replace")
+    m = re.search(r'id="hidElectionDate" value="([^"]*)"', page)
+    if not m or m.group(1) != spec["date"]:
+        raise ValueError(f"ND page shows the election of {m.group(1) if m else '?'}, not {spec['date']}")
+    out = {}
+    for m in re.finditer(r'<div class="display-results-box-a">\s*<h1>(.*?)</h1>', page):
+        d = _dist(spec["pattern"], m.group(1))
+        if d is None:
+            continue
+        j = page.find('<div class="display-results-box-a">', m.end())
+        block = page[m.start():j if j > 0 else None]
+        rows = re.findall(r'display-results-box-d"[^>]*>\s*<h2>(.*?)</h2>.*?display-results-box-g"\s*>([\d,]*)</h2>', block, re.S)
+        pm = re.search(r"Precincts Fully:\s*([\d,]+)\s*/\s*([\d,]+)", block)
+        done, total = (int(x.replace(",", "")) for x in pm.groups()) if pm else (0, 0)
+        out[d] = _reading([" ".join(n.split()) for n, _ in rows], [int(v.replace(",", "") or 0) for _, v in rows],
+                          100 * done / total if total else None, "precincts fully reported", _fetched(url))
+    return out
+
+
 def read_single(reader, src):
     """At-large states (DE, SD): the existing single-contest readers."""
     import live_sources as S
@@ -222,6 +293,19 @@ HOUSE = {
     "VA": {"read": read_ev, "site": "https://enr.elections.virginia.gov", "jurisdiction": "Virginia",
            "election": "2026-November-General", "pattern": r"Member, House of Representatives \((\d+)\w\w District\)",
            "name": "Virginia Department of Elections"},
+    "UT": {"read": read_ev, "site": "https://electionresults.utah.gov", "jurisdiction": "Utah",
+           "election": "General11032026", "pattern": r"U\.S\. House District (\d+)", "name": "Utah Lieutenant Governor (Elections)"},
+    # Washington moved to Enhanced Voting (results.vote.wa.gov/results/current redirects there);
+    # its 2026 report has Utah's layout. No earlier general on the platform to test against.
+    "WA": {"read": read_ev, "site": "https://results.votewa.gov", "jurisdiction": "Washington",
+           "election": "20261103", "pattern": r"Congressional District (\d+) - U\.S\. Representative",
+           "name": "Washington Secretary of State"},
+    "IN": {"read": read_in, "base": "https://enr.indianavoters.in.gov/site/data",
+           "pattern": r"United States Representative, \((\d+)\) District", "name": "Indiana Election Division"},
+    "ND": {"read": read_nd, "url": "https://results.sos.nd.gov/ResultsSW.aspx?text=All&type=SW&map=CTY",
+           "date": "11/3/2026", "pattern": r"Representative in Congress", "name": "North Dakota Secretary of State"},
+    "MD": {"read": read_md, "url": "https://elections.maryland.gov/elections/2026/general_results/gen_results_2026_4.html",
+           "name": "Maryland State Board of Elections"},
     "OR": {"read": read_sw_html, "url": "https://results.oregonvotes.gov/resultsSW.aspx?type=FED&map=CTY",
            "pattern": r"US Representative, (\d+)\w\w District", "name": "Oregon Secretary of State"},
     "NY": {"read": read_ny, "url": "https://nyenr.elections.ny.gov/HomeNoJS.aspx",

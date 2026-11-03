@@ -143,7 +143,7 @@ Rules agreed with the owner:
   Also checked: CA (refuses scripts, 403), PA (certificate fails verification; not bypassed),
   NV (results site needs browser cookies), VT (app, data address not found), HI (media.txt
   file exists for the primary; the general's file was not published yet), WI and CT (no
-  statewide election-night results). Not checked yet (House only): IN, MO, ND, UT, WA. Refused or blocked scripts
+  statewide election-night results). House-only states (IN, MO, ND, UT, WA): see House below. Refused or blocked scripts
   (403, captcha or JavaScript check): OH, MI, KY, OK, NM, MT, ID, AR, MN (captcha), and
   Clarity's shared domain (results.enr.clarityelections.com, used by CO, WV, AL). Louisiana's
   robots.txt forbids its results data. No statewide live results: MS, ME, NH, MA, NJ, IL, AK
@@ -165,11 +165,18 @@ Rules agreed with the owner:
   (Vice President Vance breaks ties).
 - House (added 3 November): all 435 races from one civicAPI request per round (its race search,
   type "House of Representatives"), then official results replace them district by district
-  for 13 states from the files already read for Senate/governor (pipeline/live_house.py: NC,
-  SC, IA, FL, TX, GA, VA, OR, NY, DE, SD; 150 districts). Tested against certified 2024 House
+  for 16 states (pipeline/live_house.py: NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT
+  from the files already read for Senate/governor; WA, IN, ND for the House only; 182
+  districts). Utah's and Washington's Enhanced Voting reports are named "All Results Excel" /
+  sheet "Summary Results" and list over/under votes as choices (skipped); Washington moved to
+  Enhanced Voting (results.votewa.gov, election "20261103"), no earlier general there to test.
+  Indiana: the results app's JSON (data/settings.json gives the version letter, then
+  OffCatC_1005_<letter>.json), no precinct counts. North Dakota: statewide results page, read
+  only when its hidden election date is 11/3/2026 (it showed 2024 on 3 November; tested on that
+  page, matches the certified 2024 result exactly). Missouri refuses scripts. Tested against certified 2024 House
   results where the site keeps 2024: NC, SC, IA, FL, GA, VA, every contested district within
   0.5%. Florida's file is in the Windows character set (cp1252). Not yet: AZ, RI (report
-  names unknown until published), MD (one page per contest). Written to live.json "house"
+  names unknown until published). Written to live.json "house"
   keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.

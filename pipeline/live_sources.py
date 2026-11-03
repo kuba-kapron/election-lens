@@ -271,28 +271,29 @@ def read_ev(race, src):
             if n:
                 reported.add(key)
         pct = 100 * len(reported) / len(precincts) if precincts else None
-    elif "Total Votes Excel" in reports:  # Georgia: workbook with a county sheet
-        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(reports['Total Votes Excel'])}"
+    elif "Total Votes Excel" in reports or "All Results Excel" in reports:  # Georgia; Utah's naming
+        blob = reports.get("Total Votes Excel") or reports["All Results Excel"]
+        url = f"{site}/cdn/results/{d['jurisdictionId']}/{urllib.parse.quote(blob)}"
         # statewide from "Total Votes"; counties from "County Results" when the workbook has it
         # (Georgia's 2022 workbook had precinct results instead)
         with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
             tmp.write(F.fetch(url))
             tmp.flush()
             sheets = xlsx.sheet_names(tmp.name)
-            state_rows = list(xlsx.rows(tmp.name, "Total Votes"))
+            state_rows = list(xlsx.rows(tmp.name, "Total Votes" if "Total Votes" in sheets else "Summary Results"))
             county_rows = list(xlsx.rows(tmp.name, "County Results")) if "County Results" in sheets else []
         clean = lambda b: re.sub(r"(\s*\([A-Za-z]+\))+$", "", b).strip()  # "Brian Kemp (I) (Rep)" -> "Brian Kemp"
-        skip = ("Total Votes", "Ballots Cast")
+        skip_re = re.compile(r"(total votes|ballots cast|over ?votes|under ?votes)", re.I)  # not candidates (Utah lists over/under votes)
         head = state_rows[0]
         col = {k: head.index(k) for k in ("Office Name", "Ballot Name", "Party", "Total")}
         for r in state_rows[1:]:
-            if office.search(r[col["Office Name"]] or "") and r[col["Ballot Name"]] not in skip:
+            if office.search(r[col["Office Name"]] or "") and not skip_re.fullmatch((r[col["Ballot Name"]] or "").strip()):
                 add(clean(r[col["Ballot Name"]]), r[col["Party"]], None, int(float(r[col["Total"]] or 0)))
         if county_rows:
             head = county_rows[0]
             col = {k: head.index(k) for k in ("County", "Office Name", "Ballot Name", "Total")}
             for r in county_rows[1:]:
-                if office.search(r[col["Office Name"]] or "") and r[col["Ballot Name"]] not in skip:
+                if office.search(r[col["Office Name"]] or "") and not skip_re.fullmatch((r[col["Ballot Name"]] or "").strip()):
                     name, n = clean(r[col["Ballot Name"]]), int(float(r[col["Total"]] or 0))
                     c = counties.setdefault(county_fips(race["st"], r[col["County"]]), {"votes": {}, "total": 0, "pct": None})
                     c["votes"][name] = c["votes"].get(name, 0) + n
