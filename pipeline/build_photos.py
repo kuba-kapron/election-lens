@@ -23,6 +23,11 @@ Official portraits of members of Congress (Senate and House candidates) are down
 pipeline/fetch_portraits.py into photos/congress/<Congress ID>.jpg; this script shrinks them
 the same way into web/img/congress/<ID>.jpg and lists them in web/img/congress/congress.json.
 
+Candidate photos from Wikimedia Commons (approved by the owner, downloaded by
+pipeline/fetch_commons_photos.py into photos/people/<state>-<last name>.jpg with their credits
+in photos/people/credits.json) are shrunk the same way into web/img/people/, and the credits
+are listed in web/img/people/people.json for the page's footer.
+
 Party icons work the same way: put them in photos/parties/, named by the party code the data
 uses (D, R, L, G, I), as .svg or any of the picture formats above. SVGs are copied as they
 are; pictures are fitted into a 128 x 128 square (transparency kept) and saved as .webp. The
@@ -41,6 +46,8 @@ from PIL import Image, ImageOps
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "photos"
 OUT = ROOT / "web" / "img" / "candidates"
+PEOPLE_SRC = SRC / "people"
+PEOPLE_OUT = ROOT / "web" / "img" / "people"
 CONGRESS_SRC = SRC / "congress"
 CONGRESS_OUT = ROOT / "web" / "img" / "congress"
 BIOGUIDE = re.compile(r"^[A-Z]\d{6}$")
@@ -80,6 +87,24 @@ def congress_portraits() -> None:
     (CONGRESS_OUT / "congress.json").write_text(json.dumps(available) + "\n")
     print(f"Made {made} new Congress portraits; {len(available)} in total listed in "
           f"{(CONGRESS_OUT / 'congress.json').relative_to(ROOT)}")
+
+
+def people_photos() -> None:
+    """Shrink approved Commons photos from photos/people/ and list them with their credits."""
+    PEOPLE_OUT.mkdir(parents=True, exist_ok=True)
+    credits_path = PEOPLE_SRC / "credits.json"
+    credits = json.loads(credits_path.read_text()) if credits_path.exists() else {}
+    listed = {}
+    for key, credit in sorted(credits.items()):
+        src = PEOPLE_SRC / f"{key}.jpg"
+        if not src.exists():
+            continue
+        with Image.open(src) as im:
+            im = square(ImageOps.exif_transpose(im).convert("RGB")).resize((SIZE, SIZE), Image.LANCZOS)
+            im.save(PEOPLE_OUT / src.name, "JPEG", quality=85, optimize=True, progressive=True)
+        listed[key] = credit
+    (PEOPLE_OUT / "people.json").write_text(json.dumps(listed, indent=2, ensure_ascii=False) + "\n")
+    print(f"{len(listed)} Commons photos with credits listed in {(PEOPLE_OUT / 'people.json').relative_to(ROOT)}")
 
 
 def party_icons() -> list[str]:
@@ -156,6 +181,7 @@ def main() -> int:
     print(f"Made {len(made)} new portraits; {len(available)} in total listed in "
           f"{(OUT / 'photos.json').relative_to(ROOT)}")
     congress_portraits()
+    people_photos()
     problems += party_icons()
     for p in problems:
         print("  skipped " + p)

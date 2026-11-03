@@ -1,0 +1,86 @@
+{
+  "fl-nixon": {
+    "name": "Angie Nixon",
+    "author": "Florida House of Representatives",
+    "license": "Public domain",
+    "page": "https://commons.wikimedia.org/wiki/File:Angie_Nixon_official_portrait.jpg"
+  },
+  "me-jackson": {
+    "name": "Troy Jackson",
+    "author": "ArenLeBrun",
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:Troy_Jackson_in_the_Senate_Chamber_%28cropped%29.jpg"
+  },
+  "mi-el-sayed": {
+    "name": "Abdul El-Sayed",
+    "author": "Conlan Houston",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Abdul_El-Sayed_meet-and-greet_by_Conlan_Houston_5_%28cropped%29.jpg"
+  },
+  "ms-colom": {
+    "name": "Scott Colom",
+    "author": "The Contrarian",
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Scott_Colom_2_%28cropped%29.png"
+  },
+  "nc-cooper": {
+    "name": "Roy Cooper",
+    "author": "NetwonsBucket",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Roy_Cooper_at_Roy_Cooper_Rally_April_2026-2_%28cropped%29.jpg"
+  },
+  "nc-whatley": {
+    "name": "Michael Whatley",
+    "author": "Gage Skidmore",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Michael_Whatley_%2854670563614%29_%28cropped%29.jpg"
+  },
+  "oh-acton": {
+    "name": "Amy Acton",
+    "author": "Patricio101",
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:Amy_Acton_2025.jpg"
+  },
+  "oh-husted": {
+    "name": "Jon Husted",
+    "author": "United States Senate",
+    "license": "Public domain",
+    "page": "https://commons.wikimedia.org/wiki/File:Sen._Jon_Husted_official_portrait%2C_119th_Congress.jpg"
+  },
+  "oh-ramaswamy": {
+    "name": "Vivek Ramaswamy",
+    "author": "Gage Skidmore",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Vivek_Ramaswamy_%2855241367373%29_%28cropped%29.jpg"
+  },
+  "sc-graham": {
+    "name": "Darline Graham",
+    "author": "Rosa Pineda, United States Senate",
+    "license": "Public domain",
+    "page": "https://commons.wikimedia.org/wiki/File:Official_portrait_of_Darline_Graham%2C_member_of_the_United_States_Senate_from_South_Carolina_%282026%29.jpg"
+  },
+  "tx-abbott": {
+    "name": "Greg Abbott",
+    "author": "NASA Johnson Space Center / NASA-JSC/ROBERT MARKOWITZ",
+    "license": "Public domain",
+    "page": "https://commons.wikimedia.org/wiki/File:Greg_Abbott_at_NASA_2024_%28cropped%29.jpg"
+  },
+  "tx-hinojosa": {
+    "name": "Gina Hinojosa",
+    "author": "RRC1701",
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gina_Hinojosa_at_the_AFL-CIO_COPE_convention_in_2024.jpg"
+  },
+  "tx-paxton": {
+    "name": "Ken Paxton",
+    "author": "Gage Skidmore",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Ken_Paxton_-_55022425595_%28cropped%29.jpg"
+  },
+  "tx-talarico": {
+    "name": "James Talarico",
+    "author": "Antonioaesparza",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:James_Talarico_Press_Conference_%28cropped%29.jpg"
+  }
+}
