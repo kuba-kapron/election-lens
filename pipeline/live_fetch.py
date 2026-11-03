@@ -76,6 +76,38 @@ def _paths(url):
     return CACHE / f"{key}.body", CACHE / f"{key}.meta.json"
 
 
+ARCHIVE = None  # set by the live importer: keep earlier versions of each source for the record
+ARCHIVE_EVERY = 600  # seconds: at most one kept version per source per 10 minutes
+ARCHIVE_LIMIT = 1 << 30  # 1 GB in all, then stop keeping versions (the latest copy stays in CACHE)
+_archived = {"bytes": None, "last": {}, "full": False}
+
+
+def _archive(url, data, now):
+    """Keep a gzipped copy of a changed response in ARCHIVE/<url key>/<UTC time>.gz.
+    Never raises: the record is a bonus, the live page comes first."""
+    if not ARCHIVE or _archived["full"]:
+        return
+    try:
+        key = hashlib.sha1(url.encode()).hexdigest()[:16]
+        if now - _archived["last"].get(key, 0) < ARCHIVE_EVERY:
+            return
+        if _archived["bytes"] is None:
+            _archived["bytes"] = sum(p.stat().st_size for p in ARCHIVE.rglob("*.gz"))
+        packed = gzip.compress(data, 6)
+        if _archived["bytes"] + len(packed) > ARCHIVE_LIMIT:
+            _archived["full"] = True
+            print(f"archive: {ARCHIVE_LIMIT >> 20} MB reached, no more source versions kept tonight")
+            return
+        d = ARCHIVE / key
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "url.txt").write_text(url + "\n")
+        (d / (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(now)) + ".gz")).write_bytes(packed)
+        _archived["bytes"] += len(packed)
+        _archived["last"][key] = now
+    except OSError as e:
+        print(f"archive: could not keep a copy of {url}: {e}")
+
+
 def cached(url):
     """The stored copy of url (bytes) and when it was fetched, or (None, None)."""
     body, meta = _paths(url)
@@ -125,9 +157,12 @@ def fetch(url, min_interval=MIN_INTERVAL):
                 raise Refused(f"{host}: answered with a bot check (captcha); left alone")
             meta = {"url": url, "fetched": now, "etag": r.headers.get("ETag"),
                     "last_modified": r.headers.get("Last-Modified")}
+            changed = not body_path.exists() or body_path.read_bytes() != data
             body_path.write_bytes(data)
             meta_path.write_text(json.dumps(meta))
             hs["fails"] = 0
+            if changed:
+                _archive(url, data, now)
             return data
     except urllib.error.HTTPError as e:
         if e.code == 304:  # not changed since last time

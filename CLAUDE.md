@@ -181,6 +181,11 @@ Rules agreed with the owner:
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.
   Louisiana's House vote on 3 November is an all-candidate primary (general 12 December).
+- Record of the night (not committed): each changed source file, gzipped, at most one version
+  per source every 10 minutes and 1 GB in all (data/raw/live/archive/<key>/<UTC time>.gz, with
+  url.txt), so readers can be fixed and the night re-read without asking the sites again; and
+  live.json after every round that changed more than fetch times (data/live/snapshots/, about
+  80 KB each). Not in --replay. Saving never stops the importer.
 - Local first; going public later only needs an upload of live.json (ordinary hosting with
   SFTP/rsync and no caching of live.json, or the page's ?t= query).
 

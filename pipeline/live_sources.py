@@ -438,7 +438,9 @@ def read_replay(race, src, started, minutes=20):
     if not rows:  # Alaska etc.: statewide only
         rows = [(st + "000", data["states"][st]["r"]["2024"])]
     frac = min(1.0, (time.time() - started) / (minutes * 60))
-    d_name = next(n for n, p in race["cands"] if p == "D")
+    # the Democrat, or the first other candidate where there is none (ID, NE, SD Senate)
+    d_name, d_party = next(((n, p) for n, p in race["cands"] if p == "D"),
+                           next((n, p) for n, p in race["cands"] if p != "R"))
     r_name = next(n for n, p in race["cands"] if p == "R")
     counties, done_total = {}, 0
     full = sum(v[2] for _, v in rows)
@@ -451,5 +453,5 @@ def read_replay(race, src, started, minutes=20):
         done_total += t
     dv = sum(c["votes"][d_name] for c in counties.values())
     rv = sum(c["votes"][r_name] for c in counties.values())
-    return Reading([d_name, r_name], ["D", "R"], [dv, rv], done_total, pct=100 * done_total / full if full else 0,
+    return Reading([d_name, r_name], [d_party, "R"], [dv, rv], done_total, pct=100 * done_total / full if full else 0,
                    pct_of="test replay", counties=counties, fetched=time.time(), test=True)

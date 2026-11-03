@@ -12,6 +12,7 @@ minute so the page's "updated" times stay current.
 """
 
 import argparse
+import gzip
 import json
 import os
 import sys
@@ -323,13 +324,45 @@ def official_house(races):
     return n
 
 
-def write(races, house_races, senate_not_up):
+SNAPSHOTS = ROOT / "data" / "live" / "snapshots"
+_last_snapshot = {"key": None}
+
+
+def _no_times(x):
+    """The data without fetch times, to tell a round that changed numbers from one that did not."""
+    if isinstance(x, dict):
+        return {k: _no_times(v) for k, v in x.items() if k not in ("updated", "fetched", "as_of")}
+    if isinstance(x, list):
+        return [_no_times(v) for v in x]
+    return x
+
+
+def snapshot(data, text):
+    """Keep a gzipped copy of live.json when anything besides fetch times changed:
+    data/live/snapshots/<UTC time>.json.gz, a record of how the night went (not committed).
+    Never raises: the record is a bonus, the live page comes first."""
+    try:
+        key = json.dumps(_no_times(data), sort_keys=True)
+        if key == _last_snapshot["key"]:
+            return
+        SNAPSHOTS.mkdir(parents=True, exist_ok=True)
+        (SNAPSHOTS / (time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".json.gz")).write_bytes(
+            gzip.compress(text.encode(), 6))
+        _last_snapshot["key"] = key
+    except OSError as e:
+        print(f"snapshot: could not keep a copy of live.json: {e}")
+
+
+def write(races, house_races, senate_not_up, keep=False):
     OUT.parent.mkdir(parents=True, exist_ok=True)
     data = {"updated": iso(time.time()), "year": 2026, "races": races, "house": house_races,
             "senate_not_up": senate_not_up}
+    text = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
     tmp = OUT.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+    tmp.write_text(text)
     os.replace(tmp, OUT)  # the page never sees a half-written file
+    if keep:
+        snapshot(data, text)
 
 
 def main():
@@ -344,6 +377,8 @@ def main():
     plans = json.loads((ROOT / "web/data/house/plans.json").read_text())
     held = not_up(senate)
     started = time.time()
+    if not args.replay:  # keep earlier versions of the sources too (pipeline/live_fetch.py)
+        F.ARCHIVE = ROOT / "data" / "raw" / "live" / "archive"
     while True:
         manual, calls = load(MANUAL), load(CALLS)
         races = []
@@ -355,7 +390,7 @@ def main():
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"
             print(f"{time.strftime('%H:%M:%S')} {race['id']:7} {(r.get('source') or {}).get('kind') or 'none':9} {pct:>4}  {lead}"
                   + (f"   [{'; '.join(errors)}]" if errors else ""), flush=True)
-        write(races, {} if args.replay else house(args, started, history, plans), held)
+        write(races, {} if args.replay else house(args, started, history, plans), held, keep=not args.replay)
         if args.once:
             return 0
         time.sleep(args.every)
