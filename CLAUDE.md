@@ -20,8 +20,9 @@ US presidential results 2000–2024 on one static page (`web/`):
 - Side panel: results with candidate portraits (or initials), full names, winner checkmark
   and bold, margin history chart. Tooltips with share bars (Margin) or a compact shift line.
 - Light/dark toggle (follows the system until clicked, then remembered in localStorage).
-- Navigation is year first, then race: one ribbon with every year we have (2000–2026), then
-  President | Senate | House | Governor below it; races without data that year are greyed out
+- Navigation is year first, then race: one ribbon with every year we have (2000–2026); the
+  races (President | Senate | House | Governor) are the site navigation in the top bar next
+  to the wordmark (own row on phones); races without data that year are greyed out
   with the reason on hover. Switching years keeps the race when that year has it, else
   President, else Senate (decided with the owner on 3 November 2026).
 - Shareable links: `#year=2024&view=shift&map=counties&vote=popular&arrows=on&place=48201`.

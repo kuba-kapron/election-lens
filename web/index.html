@@ -16,20 +16,20 @@
   <header class="masthead">
     <div class="masthead-row">
       <a class="wordmark" href="./">Election Lens</a>
+      <nav class="site-nav" role="radiogroup" aria-label="Race">
+        <button type="button" role="radio" aria-checked="true" data-office="president">President</button>
+        <button type="button" role="radio" aria-checked="false" data-office="senate">Senate</button>
+        <button type="button" role="radio" aria-checked="false" data-office="house">House</button>
+        <button type="button" role="radio" aria-checked="false" data-office="governor">Governor</button>
+      </nav>
       <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode"></button>
     </div>
     <h1 id="headline">How America voted, <span class="nowrap">2000 to 2024</span></h1>
     <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to each county. Pick a year, click a state to see its counties, then click a county to see how it has voted over time.</p>
   </header>
 
-  <nav class="years" aria-label="Election year and race">
+  <nav class="years" aria-label="Election year">
     <ol id="year-list"></ol>
-    <div class="mode office" role="radiogroup" aria-label="Race">
-      <button type="button" role="radio" aria-checked="true" data-office="president">President</button>
-      <button type="button" role="radio" aria-checked="false" data-office="senate">Senate</button>
-      <button type="button" role="radio" aria-checked="false" data-office="house">House</button>
-      <button type="button" role="radio" aria-checked="false" data-office="governor">Governor</button>
-    </div>
   </nav>
 
   <main class="stage">

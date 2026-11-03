@@ -225,9 +225,16 @@ h1 {
 .mg.r { color: var(--gop); }
 .mg.i { color: var(--ind); }
 
-/* Race switch below the year ribbon: races without data that year are greyed out */
-.office { margin-top: 12px; }
-.mode button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+/* Races as the site's navigation, in the top bar; races without data that year are greyed out */
+.site-nav { display: flex; gap: 22px; margin-left: 36px; margin-right: auto; }
+.site-nav button {
+  background: none; border: 0; padding: 4px 0 3px; font: inherit; font-size: 15px; font-weight: 600;
+  color: var(--muted); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap;
+}
+.site-nav button:hover { color: var(--ink); }
+.site-nav button[aria-checked="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.site-nav button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.site-nav button[aria-disabled="true"]:hover { color: var(--muted); }
 /* "Live" next to 2026: grey until the first votes are counted, then a pulsing red dot */
 .years .live-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; vertical-align: 0.3em;
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -547,6 +554,11 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .years .yr { font-size: 16px; }
   .years .who { display: none; }
   .years ol { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  /* phone: the race links get their own row under the wordmark */
+  .masthead-row { flex-wrap: wrap; }
+  .site-nav { order: 3; width: 100%; margin: 14px 0 0; gap: 0; justify-content: space-between; }
+  /* own line under the year; inline-flex so the year's underline does not carry over to it */
+  .years .live-tag { display: inline-flex; width: 100%; margin: 9px 0 0; }
   /* two rows of years: underline the chosen year itself, so the line can't look like it
      belongs to the year above it */
   .years button { border-top-color: transparent !important; padding-top: 8px; }
@@ -564,4 +576,3 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .test-flag { margin: 0 0 12px; padding: 6px 10px; border-radius: 6px; font-weight: 700; font-size: 13px;
   background: var(--focus); color: #15202b; display: inline-block; }
 .muted { color: var(--muted); font-weight: 400; }
-.office button { white-space: nowrap; }
