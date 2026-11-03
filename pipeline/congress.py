@@ -457,7 +457,7 @@ def one_name_per_person(races_by_year, names_set_by_hand):
             c["name"] = f"{given[c['bio']][1]} {c['last']}"
 
 
-ELECTION_DATE = {2020: "2020-11-03", 2022: "2022-11-08", 2024: "2024-11-05"}
+ELECTION_DATE = {2020: "2020-11-03", 2022: "2022-11-08", 2024: "2024-11-05", 2026: "2026-11-03"}
 
 
 def sitting(m, chamber, year):
