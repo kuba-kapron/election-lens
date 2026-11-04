@@ -1109,6 +1109,10 @@
       <p class="summary">${r.cands[l.lead].name} won the county ${byText(l)}. ${fmtInt(v[n + 1])} votes.</p>
       <p class="note">${note}</p>${notesList(r.notes)}`;
   }
+  // who controlled the Senate after an election: the majority, or in a 50–50 split the vice
+  // president's party (2020: Kamala Harris, from January 2021; see the control note)
+  const SENATE_TIE_BREAK = { 2020: "D" };
+  const senateControl = (c, y) => (c.D > c.R ? "D" : c.R > c.D ? "R" : SENATE_TIE_BREAK[y] ?? null);
   function senateSeatsBody(y) {
     const c = extra.senate.control[y], rs = sYear(y);
     const won = { D: 0, R: 0, I: 0 };
@@ -1116,14 +1120,14 @@
     const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
     for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
       lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
-    return `${tugBar(t, 100, "51 for control", pg, "seats")}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>
+    return `${tugBar(t, 100, "51 for control", pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>
       <ul class="notes"><li>Counts independents with the party they caucus with. A majority needs 51 seats, or 50 and the vice president's tie-breaking vote.</li>${c.note ? `<li>${c.note}</li>` : ""}</ul>`;
   }
   function houseSeatsBody(y) {
     const c = extra.house.seats[y];
     const t = {};
     for (const p of ["D", "R"]) t[p] = { solid: c[p], lead: 0, lines: [`${c[p]} won`] };
-    return `${tugBar(t, 435, "218 for a majority", houseGains(y), "districts")}${popSection(extra.house.popular[y])}`;
+    return `${tugBar(t, 435, "218 for a majority", houseGains(y), "districts", "", c.D >= 218 ? "D" : c.R >= 218 ? "R" : null)}${popSection(extra.house.popular[y])}`;
   }
   // House popular vote: [Democratic, Republican, all] votes over the races given (first round,
   // as counted so far tonight); unopposed races not on the ballot add nothing
@@ -1292,9 +1296,9 @@
     const n = called.D + called.R + called.I;
     const upd = liveFile()?.updated || liveFile("senate")?.updated;
     const on = !!night?.counting;
-    // the update time sits next to the Live tag, so the narrow card's second line has room for the calls
+    // right of the year: the Live tag with the update time under it; the calls on the line below
     const time = upd ? `<span class="live-time" title="Results updated at ${clock(upd)}">${clock(upd)}</span>` : "";
-    const tag = `<span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live${time}</span>`;
+    const tag = `<span class="live-stack"><span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>${time}</span>`;
     return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""}` : "live tonight"}</span>`;
   }
   function liveSource(r) {
@@ -1361,7 +1365,8 @@
   // for the Senate, not up), light = leading; others next to the Democrats; grey = no votes yet.
   // t[p] = { solid, lead, lines: [...] }; need = control marker text or null;
   // races = live races for pickups, or a gains object already counted (past years).
-  function tugBar(t, total, needText, races, what, under = "") {
+  // control = the party that holds the majority (past years) or has secured it tonight: its name in bold
+  function tugBar(t, total, needText, races, what, under = "", control = null) {
     const n = p => (t[p] ? t[p].solid + t[p].lead : 0);
     const seg = (k, c, w) => (k ? `<span style="width:${(k / total) * 100}%;background:${c}" title="${w}: ${k}"></span>` : "");
     const segs = p => [seg(t[p]?.solid, colors[ckey(p) + "Solid"], t[p]?.solidText || "Won"), seg(t[p]?.lead, colors[ckey(p)][1], "Leading")];
@@ -1385,7 +1390,7 @@
     const gainSide = p => `<ul class="tug-lines tug-gains-side ${p === "D" ? "dem" : "gop"}">${arrows(p)}</ul>`;
     const other = n("I") ? `<p class="tug-other">${CAUCUS_NAME.I}: ${n("I")} (${t.I.lines.join(", ")})</p>` : "";
     return `<div class="tug">
-      <div class="tug-head"><span class="dem">${partyAvatar("D", colors.demSolid)}<span class="tug-who">${num("D")}<span class="pname" data-short="${SHORT_NAME.D}" data-full="${CAUCUS_NAME.D}">${CAUCUS_NAME.D}</span></span></span><span class="gop"><span class="tug-who">${num("R")}<span class="pname" data-short="${SHORT_NAME.R}" data-full="${CAUCUS_NAME.R}">${CAUCUS_NAME.R}</span></span>${partyAvatar("R", colors.gopSolid)}</span></div>
+      <div class="tug-head"><span class="dem">${partyAvatar("D", colors.demSolid)}<span class="tug-who">${num("D")}<span class="pname${control === "D" ? " has-control" : ""}" data-short="${SHORT_NAME.D}" data-full="${CAUCUS_NAME.D}"${control === "D" ? ' title="Majority"' : ""}>${CAUCUS_NAME.D}</span></span></span><span class="gop"><span class="tug-who">${num("R")}<span class="pname${control === "R" ? " has-control" : ""}" data-short="${SHORT_NAME.R}" data-full="${CAUCUS_NAME.R}"${control === "R" ? ' title="Majority"' : ""}>${CAUCUS_NAME.R}</span></span>${partyAvatar("R", colors.gopSolid)}</span></div>
       ${g.any ? `<div class="tug-foot tug-gains">${gainSide("D")}${gainSide("R")}</div>` : ""}
       <div class="bar ev-bar tug-bar" style="--need:0.5">${ds}${dl}${is_}${il}<i class="gap"></i>${rl}${rs}${needText != null ? `<i class="need" title="${needText || "Half the seats"}"></i>` : ""}</div>
       ${needText ? `<p class="tug-need">${needText}</p>` : ""}
@@ -1416,9 +1421,8 @@
     for (const p of ["D", "R", "I"]) t[p] = { solid: b[p].notUp + b[p].called, lead: b[p].leading, solidText: "Not up or won",
       lines: [`${b[p].notUp} not up`, `${b[p].called} won`, `${b[p].leading} leading`] };
     const changed = (notUp.seats || []).filter(x => x.note);
-    return `${tugBar(t, 100, "51 for control (50 for Republicans)", liveRaces("senate"), "seats")}
-      <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties.</li>
-      <li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
+    return `${tugBar(t, 100, "51 for control (50 for Republicans)", liveRaces("senate"), "seats", "", t.D.solid >= 51 ? "D" : t.R.solid >= 50 ? "R" : null)}
+      <ul class="notes"><li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
       ${popSection(senatePopular(null, liveRaces("senate")), true)}<p class="note">${SENATE_POP_NOTE.replace("this year's", "tonight's")}</p>
       <h3>Races</h3>`;
   }
@@ -1613,7 +1617,7 @@
     const x = liveHouseTally(rs), t = {};
     for (const p of ["D", "R"]) t[p] = { solid: x.won[p], lead: x[p] - x.won[p], lines: [`${x.won[p]} won`, `${x[p] - x.won[p]} leading`] };
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}${tugBar(t, 435, "218 for a majority", rs, "districts")}${popSection(houseVotes(rs), true)}
+    return `${test}${tugBar(t, 435, "218 for a majority", rs, "districts", "", t.D.solid >= 218 ? "D" : t.R.solid >= 218 ? "R" : null)}${popSection(houseVotes(rs), true)}
 `;
   }
   function drawLiveHousePanel() {

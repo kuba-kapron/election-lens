@@ -242,11 +242,12 @@ h1 {
 .site-nav button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
 .site-nav button[aria-disabled="true"]:hover { color: var(--muted); }
 /* "Live" next to 2026: grey until the first votes are counted, then a pulsing red dot */
-.years .live-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; vertical-align: 0.3em;
+.years .live-stack { display: inline-flex; flex-direction: column; gap: 2px; margin-left: 10px; vertical-align: top; padding-top: 0.15em; }
+.years .live-tag { display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .years .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .years .live-tag.on { color: var(--gop); }
-.years .live-time { margin-left: 4px; color: var(--muted); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.years .live-time { font-size: 11px; line-height: 1.2; color: var(--muted); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .years .live-tag.on .live-dot { background: var(--gop); animation: live-pulse 1.6s ease-in-out infinite; }
 @keyframes live-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gop) 60%, transparent); }
@@ -561,6 +562,8 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .tug-head .gop .tug-who { align-items: flex-end; text-align: right; }
 .tug-num { display: flex; align-items: baseline; gap: 6px; }
 .tug-head .pname { font-size: 13px; color: var(--muted); }
+/* the party with the majority: its name stands out */
+.tug-head .pname.has-control { color: var(--ink); font-weight: 700; }
 .tug-head .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tug-head .avatar { width: 36px; height: 36px; margin: 0; }
 .tug-head b { font-size: 26px; font-variant-numeric: tabular-nums; }
@@ -626,7 +629,7 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .masthead-row { flex-wrap: wrap; }
   .site-nav { order: 3; width: 100%; margin: 14px 0 0; gap: 0; justify-content: space-between; }
   /* own line under the year; inline-flex so the year's underline does not carry over to it */
-  .years .live-tag { display: inline-flex; width: 100%; margin: 9px 0 0; }
+  .years .live-stack { display: flex; flex-direction: row; gap: 8px; width: 100%; margin: 9px 0 0; padding: 0; }
   /* two rows of years: underline the chosen year itself, so the line can't look like it
      belongs to the year above it */
   .years button { border-top-color: transparent !important; padding-top: 8px; }
