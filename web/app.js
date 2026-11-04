@@ -36,7 +36,10 @@
       if (office !== "house") return;
     }
     if (office === "senate" && !extra.senate) extra.senate = await d3.json("data/senate.json");
-    if (office === "house" && !extra.house) extra.house = await d3.json("data/house.json");
+    if (office === "house" && !extra.house) {
+      [extra.house, extra.plans] = await Promise.all([d3.json("data/house.json"), extra.plans || d3.json("data/house/plans.json")]);
+      markHouseHeld();
+    }
     if (office === "house" && year && !extra.districts[year]) {
       // each state's map is stored once, in the file of the year it first appeared;
       // plans.json says which file each state uses in each election
@@ -48,6 +51,19 @@
         extra.planFiles[py] = topojson.feature(t, t.objects.districts).features;
       }));
       extra.districts[year] = need.flatMap(py => extra.planFiles[py].filter(f => use[f.properties.st] === py));
+    }
+  }
+  // Past House races: "held" = the party that won the same district two years earlier, only where
+  // the state kept its map (plans.json); as Senate races carry it from their seat history.
+  // Unknown (no earlier year, or a new map) stays unset: no flip is shown or counted.
+  function markHouseHeld() {
+    for (const [y, races] of Object.entries(extra.house.races)) {
+      const prev = String(+y - 2), before = extra.house.races[prev];
+      if (!before || !extra.plans[y] || !extra.plans[prev]) continue;
+      for (const [id, r] of Object.entries(races)) {
+        const st = id.slice(0, 2);
+        if (extra.plans[y][st] === extra.plans[prev][st] && before[id]) r.held = before[id].cands[0].caucus;
+      }
     }
   }
   // Year first, then the race: every year we have, and which races each year has.
@@ -84,9 +100,11 @@
 
   // ---------- state ----------
   // office: president | senate | house | governor   mode: margin | shift   level: counties | states
-  // vote: ec | popular (national panel; "ec" means seats for Senate and House)
   // seat: regular | special (Senate state with two races)   round: index of the election round shown, null = deciding
-  const state = { office: "president", year: 2024, mode: "margin", level: "states", vote: "ec", arrows: false,
+  // cmap: how state and race maps are colored: "winner" (won or called: solid, flips striped;
+  // tonight's leads in one light shade) or "margin" (shaded by margin); the president's
+  // Winner | Margin | Shift control sets it together with mode
+  const state = { office: "president", year: 2024, mode: "margin", level: "states", cmap: "winner", arrows: false,
     seat: "regular", round: null, sel: { type: "nation" } };
   readHash(true);
   // the Senate file labels midterm years in the ribbon; the live file labels 2026
@@ -138,6 +156,19 @@
     if (sel.type === "state") return data.states[sel.id].name;
     return data.counties[sel.id]?.name ?? "Unknown";
   }
+  // Panel headlines: the office in a small line above the place ("U.S. Senate" over "Georgia",
+  // "Governor" over "Fulton County, GA"), so a screenshot carries its context.
+  const OFFICE_HEAD = { president: "President", senate: "U.S. Senate", house: "U.S. House", governor: "Governor" };
+  function placeName(sel) {
+    if (sel.type === "county") return `${data.counties[sel.id]?.name ?? "Unknown"}, ${data.states[sel.id.slice(0, 2)].abbr}`;
+    if (sel.type === "district") return districtName(sel.id);
+    return name(sel);
+  }
+  function headline(office, sel, where, special = false) {
+    const k = sel.type === "nation" && office === "governor" ? "Governors" : OFFICE_HEAD[office];
+    return `<p class="kicker">${k}${special ? " · special election" : ""}</p><h2>${placeName(sel)}</h2><p class="where">${where}</p>`;
+  }
+  const liveWhen = () => { const u = liveFile()?.updated; return `2026 · live${u ? `, updated ${clock(u)}` : ""}`; };
   function stateOf(sel) { return sel.type === "county" || sel.type === "district" ? sel.id.slice(0, 2) : sel.type === "state" ? sel.id : null; }
   function visibleShapes(y) {
     if (state.office === "senate" || state.office === "governor") return counties; // Senate county figures use the old Connecticut counties
@@ -178,7 +209,8 @@
     return state.mode === "margin" ? margin(record(sel, y)) : shift(sel, y);
   }
   // Electoral College + states + winner view: solid = party kept the state, stripes = flipped
-  const categorical = () => state.vote === "ec" && state.level === "states" && state.mode === "margin";
+  // president map, Winner: states solid for a hold, striped for a flip (states only; counties show the margin)
+  const categorical = () => state.cmap === "winner" && state.level === "states" && state.mode === "margin";
   function stateWinner(st, y) {
     const e = data.electoral[String(y)]?.states[st];
     return e ? (e[0] > e[1] ? "dem" : "gop") : null;
@@ -544,7 +576,7 @@
         // names: the Electoral College winner first
         const order = winnerFirst(y);
         const ev = { dem: `<span class="mg d">${d}</span>`, gop: `<span class="mg r">${r}</span>` };
-        const score = state.vote === "ec"
+        const score = categorical()
           ? order.map(p => ev[p]).join("–")
           : `<span class="mg ${m >= 0 ? "d" : "r"}">${mlabel(m)}</span>`;
         // winner only: nine years share the ribbon
@@ -560,17 +592,12 @@
     const v = record(s, y);
     const st = stateOf(s);
     const where = s.type === "county" && !SINGLE.has(st) ? data.states[st].name
-      : s.type === "nation" ? (state.vote === "ec" ? "Electoral votes won, 270 needed to win" : "Popular vote, all counties")
+      : s.type === "nation" ? "Electoral votes won, 270 needed to win"
       : `Statewide, ${evOf(st, y)} electoral votes`;
-    let html = `<h2>${name(s)}</h2><p class="where">${where}</p>`;
+    let html = headline("president", s, `${y} · ${where}`);
+    // country: electoral votes, then the popular vote (the same section as Senate and House)
     if (s.type === "nation") {
-      html += `<div class="mode vote-toggle" role="radiogroup" aria-label="National result">
-        <button type="button" role="radio" aria-checked="${state.vote === "ec"}" data-vote="ec">Electoral College</button>
-        <button type="button" role="radio" aria-checked="${state.vote === "popular"}" data-vote="popular">Popular vote</button></div>`;
-    }
-
-    if (s.type === "nation" && state.vote === "ec") {
-      html += electoralBody(y, c, v);
+      html += electoralBody(y, c, v) + popSection(v);
     } else if (!v) {
       html += `<p class="empty">No ${y} results for this place. ${noDataReason(s, state.year)}</p>`;
     } else {
@@ -599,7 +626,8 @@
       if (note) html += `<p class="note">${note}</p>`;
     }
 
-    const evChart = s.type === "nation" && state.vote === "ec";
+    // country: electoral votes under the Winner map, the popular-vote margin under Margin and Shift
+    const evChart = s.type === "nation" && categorical();
     html += `<h3>${evChart ? "Electoral votes in every election" : "Margin in every election"}</h3>${historyChart(s, evChart)}`;
 
     const actions = [];
@@ -612,25 +640,12 @@
       else select({ type: "nation" }, true);
     }));
     panel.querySelectorAll("[data-year]").forEach(el => el.addEventListener("click", () => setYear(+el.dataset.year)));
-    panel.querySelectorAll("[data-vote]").forEach(b => b.addEventListener("click", () => setVote(b.dataset.vote)));
   }
 
   // National result as the Electoral College counted it (electoral votes won from each state)
   function electoralBody(y, c, v) {
     const e = ec(y), [d, r] = e.won;
     const won = d > r ? "dem" : "gop", lost = won === "dem" ? "gop" : "dem";
-    const tally = { dem: { states: 0, dc: false }, gop: { states: 0, dc: false } };
-    const splits = [];
-    for (const [st, [ed, er]] of Object.entries(e.states)) {
-      const p = ed > er ? "dem" : "gop";
-      if (st === "11") tally[p].dc = true; else tally[p].states++;
-      if (ed && er) splits.push(`${data.states[st].name} gave ${Math.min(ed, er)} to ${ed < er ? c.dem : c.gop}`);
-    }
-    const carried = p => `${tally[p].states} states${tally[p].dc ? " and DC" : ""}`;
-    let text = `${c[won]} won ${e.won[won === "dem" ? 0 : 1]} electoral votes to ${c[lost]}'s ${e.won[lost === "dem" ? 0 : 1]}, carrying ${carried(won)}. ${c[lost]} carried ${carried(lost)}.`;
-    if (splits.length) text += ` Maine and Nebraska award some votes by district: ${splits.join("; ")}.`;
-    const pop = v[0] >= v[1] ? "dem" : "gop";
-    if (pop !== won) text += ` ${c[pop]} won the popular vote but lost the election.`;
     let cast = "";
     if (e.cast) cast = `<p class="note">When the electors met, the official count was ${c[won]} ${e.cast[won]}, ${c[lost]} ${e.cast[lost]}. ${e.cast.note}</p>`;
     return `<div class="cand">
@@ -638,7 +653,7 @@
           ? evRow(fullName(c.dem) + partyTag("D"), d, colors.demSolid, won === "dem", c.dem)
           : evRow(fullName(c.gop) + partyTag("R"), r, colors.gopSolid, won === "gop", c.gop)).join("")}
       </div>
-      <p class="summary">${text}</p>${cast}`;
+      ${cast}`;
   }
 
   function evRow(label, ev, fill, winner, last) {
@@ -718,6 +733,17 @@
   // a candidate's color in bars: Greens and Libertarians in their own colors, the rest by caucus
   const candFill = c => (c.party === "G" ? colors.grnSolid : c.party === "L" ? colors.libSolid : colors[ckey(c.caucus) + "Solid"]);
   const CAUCUS_NAME = { D: "Democrats", R: "Republicans", I: "Independents" };
+  const SHORT_NAME = { D: "Dems", R: "GOP", I: "Others" };
+  // totals bars: full party names, or "Dems" and "GOP" (both together) when either does not fit
+  function fitPartyNames() {
+    document.querySelectorAll(".tug-head").forEach(h => {
+      const names = [...h.querySelectorAll(".pname")];
+      names.forEach(n => { n.textContent = n.dataset.full; n.title = ""; });
+      if (names.some(n => n.scrollWidth > n.clientWidth + 1))
+        names.forEach(n => { n.textContent = n.dataset.short; n.title = n.dataset.full; });
+    });
+  }
+  window.addEventListener("resize", () => fitPartyNames());
   // Party after a name: the letter, "(D)", then its icon from img/parties/ when there is one.
   // Takes a party code or a candidate.
   const PARTY_NAME = { D: "Democratic Party", R: "Republican Party", L: "Libertarian Party", G: "Green Party", I: "Independent" };
@@ -803,13 +829,15 @@
     return `<span class="mg ${cls}">${l.caucus}+${pts < 0.05 ? "0.0" : pts.toFixed(1)}</span>`;
   }
   const byText = l => (l.m < 0.001 ? `by ${fmtInt(l.gap)} votes` : `by ${(l.m * 100).toFixed(1)} points`);
-  // solid winner color; stripes when a Senate seat changed party
+  // past years: a line in the tooltip when the seat changed party
+  const flipLine = r => (r?.held && r.held !== r.cands[0].caucus ? `<span class="flip">${CAUCUS_NAME[r.cands[0].caucus]} gained the seat</span>` : "");
+  // solid winner color; stripes when a seat changed party (Senate seat history; House: same district, same map)
   function seatFill(r) {
     const w = ckey(r.cands[0].caucus);
     return r.held && r.held !== r.cands[0].caucus ? `url(#flip-${w})` : colors[w + "Solid"];
   }
-  const congressCategorical = () => !isLive() && state.vote === "ec" && state.sel.type === "nation" &&
-    (state.office === "house" || state.level === "states");
+  const congressCategorical = () => !isLive() && state.cmap === "winner" &&
+    (state.office === "house" || (state.level === "states" && state.sel.type === "nation"));
 
   function drawCongressMap() {
     const handlers = sel => sel
@@ -842,7 +870,7 @@
         .attr("fill", f => {
           const r = races[f.properties.id];
           if (isLive()) return liveFill(r);
-          return !r ? colors.nodata : congressCategorical() ? colors[ckey(r.cands[0].caucus) + "Solid"] : leanColor(raceLean(r));
+          return !r ? colors.nodata : congressCategorical() ? seatFill(r) : leanColor(raceLean(r));
         });
     }
     drawSelection();
@@ -895,8 +923,7 @@
           body = liveTip(r);
         } else {
           body = raceTip(r, roundOf(r).votes, roundOf(r).total, raceLean(r), 0);
-          const w = r.cands[0].caucus;
-          if (r.held && r.held !== w) extraLine = `<span class="flip">${CAUCUS_NAME[w]} gained the seat</span>`;
+          extraLine = flipLine(r);
           if (r.rounds.length > 1) extraLine += `<span class="hint">${roundOf(r).label}</span>`;
         }
         if (!SINGLE.has(st)) hint = `<span class="hint">Click to see ${sname}'s counties</span>`;
@@ -921,6 +948,7 @@
           const r = races[`${st}-00`];
           label = `${sname} <span class="ev">At large, 1 seat</span>`;
           body = isLive() ? liveTip(r) : raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0);
+          if (!isLive()) extraLine = flipLine(r);
         } else {
           const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-"));
           const won = { D: 0, R: 0, I: 0 };
@@ -936,12 +964,18 @@
         const r = races[f.properties.id];
         label = districtName(f.properties.id);
         body = !r ? "No result" : isLive() ? liveTip(r) : raceTip(r, roundOf(r)?.votes, roundOf(r)?.total, raceLean(r), 0);
+        if (r && !isLive()) extraLine = flipLine(r);
       }
     }
     tip.innerHTML = `<strong>${label}</strong>${body}${extraLine}${hint}`;
     placeTip(e);
   }
 
+  // the asterisk note under the map legend: seats left out of flips and pickups
+  function flipNote(unknown, any, what, why) {
+    if (!unknown || !any) return "";
+    return `<span class="legend-note">* Leaves out ${unknown} ${unknown === 1 ? what.replace(/s$/, "") : what} with no earlier result to compare${why ? ` (${why})` : ""}.</span>`;
+  }
   function drawCongressLegend() {
     const el = document.getElementById("legend");
     if (isLive()) return drawLiveLegend(el);
@@ -952,13 +986,13 @@
     if (congressCategorical()) {
       const items = [key(colors.demSolid, "Democratic"), key(colors.gopSolid, "Republican")];
       if (shown.some(r => r.cands[0].caucus === "I")) items.push(key(colors.indSolid, "Independent"));
-      if (sen) {
-        const flips = new Set(shown.filter(r => r.held && r.held !== r.cands[0].caucus).map(r => r.cands[0].caucus));
-        if (flips.has("D")) items.push(key("url(#flip-dem)", "Flipped to Democrats"));
-        if (flips.has("R")) items.push(key("url(#flip-gop)", "Flipped to Republicans"));
-        items.push(key(colors.nodata, "No race this year"));
-      }
-      el.innerHTML = items.join("");
+      const flips = new Set(shown.filter(r => r.held && r.held !== r.cands[0].caucus).map(r => r.cands[0].caucus));
+      const star = flipNote(shown.filter(r => !r.held).length, shown.some(r => r.held), sen ? "seats" : "districts",
+        sen ? "" : `new map since ${state.year - 2}`);
+      if (flips.has("D")) items.push(key("url(#flip-dem)", `Flipped to Democrats${star ? "*" : ""}`));
+      if (flips.has("R")) items.push(key("url(#flip-gop)", `Flipped to Republicans${star ? "*" : ""}`));
+      if (sen) items.push(key(colors.nodata, "No race this year"));
+      el.innerHTML = items.join("") + (flips.size ? star : "");
       return;
     }
     const b = BINS.margin;
@@ -970,9 +1004,10 @@
     el.innerHTML = html;
   }
 
-  function senatePopular(y) {
+  const SENATE_POP_NOTE = "Adds up the November votes in this year's Senate races only: about a third of the states, and some races had no Democrat or no Republican. States with two races count twice.";
+  function senatePopular(y, races = null) {
     const t = [0, 0, 0];
-    for (const r of sYear(y)) {
+    for (const r of races || sYear(y)) {
       if (!r.rounds.length) continue;
       const rd = r.rounds[0]; // November vote (first round)
       r.cands.forEach((c, i) => { if (c.party === "D") t[0] += rd.votes[i]; else if (c.party === "R") t[1] += rd.votes[i]; });
@@ -982,7 +1017,7 @@
   }
   function congressYearLabel(y, office = state.office) {
     const sen = office === "senate";
-    if (state.vote === "popular") {
+    if (state.cmap === "margin") {
       const v = sen ? senatePopular(y) : extra.house.popular[y], m = margin(v);
       return `<span class="yr">${y}</span><span class="who"><span class="mg ${m >= 0 ? "d" : "r"}">${mlabel(m)}</span> popular vote</span>`;
     }
@@ -1040,21 +1075,19 @@
   function raceBody(r) {
     if (!r.rounds.length) {
       return `<div class="cand">${personRow(r.cands[0], null, null, true)}</div>
-        <p class="summary">${r.cands[0].name} won unopposed.</p>${notesList(r.notes)}`;
+        <p class="note">Won unopposed</p>${notesList(r.notes)}`;
     }
     const last = r.rounds.length - 1;
     const ri = state.round != null && state.round <= last ? state.round : last;
     const rd = r.rounds[ri], l = lean(r.cands, rd.votes, rd.total);
-    let summary = ri === last
-      ? `${r.cands[0].name} won ${byText(l)}.`
-      : `${r.cands[l.lead].name} led ${byText(l)}; the seat was decided in the ${r.rounds[last].kind === "runoff" ? "runoff" : "final round"}.`;
-    if (state.office === "senate" && r.held) {
-      const w = r.cands[0].caucus;
-      summary += r.held === w ? ` ${CAUCUS_NAME[w]} kept the seat.` : ` ${CAUCUS_NAME[w]} gained the seat from the ${CAUCUS_NAME[r.held]}.`;
-    }
+    // grey lines, as tonight: what the numbers are, and whether the seat changed party
+    const facts = [rd.label, `${fmtInt(rd.total)} votes`];
+    if (ri !== last) facts.push(`decided in the ${r.rounds[last].kind === "runoff" ? "runoff" : "final round"}`);
+    const w = r.cands[0].caucus;
+    const flip = r.held && r.held !== w
+      ? `<p class="note"><strong>Flipped</strong> · ${CAUCUS_NAME[w]} gained the seat from the ${CAUCUS_NAME[r.held]}</p>` : "";
     return `${roundTabs(r, ri)}<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, 0)}</div>
-      <p class="summary">${summary} ${fmtInt(rd.total)} votes.</p>
-      <p class="note">${rd.label}.</p>${notesList(r.notes)}`;
+      <p class="note">${facts.join(" · ")}</p>${flip}${notesList(r.notes)}`;
   }
   function countyBody(r, fips) {
     const v = r.counties?.[fips];
@@ -1066,56 +1099,65 @@
       <p class="summary">${r.cands[l.lead].name} won the county ${byText(l)}. ${fmtInt(v[n + 1])} votes.</p>
       <p class="note">${note}</p>${notesList(r.notes)}`;
   }
-  function seatRow(label, n, total, need, fill, winner, caucus) {
-    const mark = winner ? ` <span class="won">${CHECK}<span class="sr">majority</span></span>` : "";
-    return `<div class="cand-row${winner ? " is-winner" : ""}">${partyAvatar(caucus, fill)}<div class="cand-main"><span class="name">${label}${mark}</span><span class="pct">${n}</span>
-      <div class="bar ev-bar" style="--need:${need / total}"><span style="width:${(n / total) * 100}%;background:${fill}"></span><i class="need" title="${need} for a majority"></i></div>
-      <span class="votes">${n} of ${total} seats</span></div></div>`;
-  }
-  function seatRows(c, total, need) {
-    const lead = c.R > c.D ? "R" : c.D > c.R ? "D" : null;
-    return (lead === "R" ? ["R", "D"] : ["D", "R"]).map(p =>
-      seatRow(CAUCUS_NAME[p], c[p], total, need, colors[ckey(p) + "Solid"], lead === p, p)).join("");
-  }
   function senateSeatsBody(y) {
     const c = extra.senate.control[y], rs = sYear(y);
-    const won = { D: 0, R: 0, I: 0 }, gained = { D: [], R: [], I: [] };
-    for (const r of rs) {
-      const w = r.cands[0].caucus;
-      won[w]++;
-      if (r.held && r.held !== w) gained[w].push(data.states[r.st].name + (r.seat === "special" ? " (special)" : ""));
-    }
-    const specials = rs.filter(r => r.seat === "special").length;
-    const lead = c.R > c.D ? "R" : c.D > c.R ? "D" : null;
-    let text = lead ? `After the ${y} election, ${CAUCUS_NAME[lead]} held ${Math.max(c.D, c.R)} seats to ${Math.min(c.D, c.R)}.`
-      : `After the ${y} election, the Senate was split 50–50.`;
-    text += ` ${rs.length} seats were up${specials ? `, ${specials} of them in special elections` : ""}: Democrats won ${won.D}, Republicans ${won.R}${won.I ? `, independents ${won.I}` : ""}.`;
-    const list = a => (a.length > 1 ? a.slice(0, -1).join(", ") + " and " + a[a.length - 1] : a[0]);
-    const g = ["D", "R"].filter(p => gained[p].length).map(p => `${CAUCUS_NAME[p]} gained ${list(gained[p])}.`);
-    text += g.length ? ` ${g.join(" ")}` : " No seat changed party.";
-    return `<div class="cand">${seatRows(c, 100, 51)}</div><p class="summary">${text}</p>
+    const won = { D: 0, R: 0, I: 0 };
+    for (const r of rs) won[r.cands[0].caucus]++;
+    const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
+    for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
+      lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
+    return `${tugBar(t, 100, "51 for control", pg, "seats")}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>
       <ul class="notes"><li>Counts independents with the party they caucus with. A majority needs 51 seats, or 50 and the vice president's tie-breaking vote.</li>${c.note ? `<li>${c.note}</li>` : ""}</ul>`;
   }
   function houseSeatsBody(y) {
-    const c = extra.house.seats[y], races = Object.values(extra.house.races[y]);
-    const lead = c.R > c.D ? "R" : "D";
-    const unopposed = races.filter(r => r.unopposed).length;
-    let text = `${CAUCUS_NAME[lead]} won ${c[lead]} of 435 seats, ${c[lead] - 217} more than the 218 needed for a majority.`;
-    if (unopposed) text += ` ${unopposed} ${unopposed === 1 ? "race was" : "races were"} unopposed and not on the ballot.`;
-    return `<div class="cand">${seatRows(c, 435, 218)}</div><p class="summary">${text}</p>`;
+    const c = extra.house.seats[y];
+    const t = {};
+    for (const p of ["D", "R"]) t[p] = { solid: c[p], lead: 0, lines: [`${c[p]} won`] };
+    return `${tugBar(t, 435, "218 for a majority", houseGains(y), "districts")}${popSection(extra.house.popular[y])}`;
   }
-  function popularBody(y) {
-    const sen = state.office === "senate";
-    const v = sen ? senatePopular(y) : extra.house.popular[y];
-    const lead = v[0] >= v[1] ? "D" : "R", l = { m: Math.abs(margin(v)), gap: Math.abs(v[0] - v[1]) };
-    const row = (p, n) => candRow(CAUCUS_NAME[p], n, v[2], colors[ckey(p) + "Solid"], p === lead, null, partyAvatar(p, colors[ckey(p) + "Solid"]));
-    const caveat = sen
-      ? "Adds up the November votes in this year's Senate races only: about a third of the states, and some races had no Democrat or no Republican. States with two races count twice."
-      : "Adds up the votes in all 435 races. Unopposed races with no votes counted, and districts without a Democrat or a Republican, make it a rough measure of national support.";
-    return `<div class="cand">${(lead === "D" ? [["D", v[0]], ["R", v[1]]] : [["R", v[1]], ["D", v[0]]]).map(([p, n]) => row(p, n)).join("")}
-      ${v[2] - v[0] - v[1] > 0 ? candRow("Others", v[2] - v[0] - v[1], v[2], "var(--muted)") : ""}</div>
-      <p class="summary">${lead === "D" ? "Democratic" : "Republican"} candidates received ${(l.m * 100).toFixed(1)} points more of the vote than ${lead === "D" ? "Republican" : "Democratic"} candidates. ${fmtInt(v[2])} votes.</p>
-      <p class="note">${caveat}</p>`;
+  // House popular vote: [Democratic, Republican, all] votes over the races given (first round,
+  // as counted so far tonight); unopposed races not on the ballot add nothing
+  function houseVotes(races) {
+    const v = [0, 0, 0];
+    for (const r of races) {
+      const rd = r.rounds?.[0];
+      if (!rd || !rd.total) continue;
+      r.cands.forEach((c, i) => { if (c.caucus === "D") v[0] += rd.votes[i]; else if (c.caucus === "R") v[1] += rd.votes[i]; });
+      v[2] += rd.total;
+    }
+    return v;
+  }
+  // Popular vote section under the seats bar: shares on a bar (Democrats from the left,
+  // Republicans from the right, others in the middle), with the vote counts; then grey lines,
+  // like a single race: others, and the votes counted (share counted in brackets where known)
+  function popSection(v, live = false, heading = true, counted = null) {
+    if (!v || !v[2]) return "";
+    const pc = n => (n / v[2]) * 100, other = v[2] - v[0] - v[1];
+    const seg = (n, c, who) => (n ? `<span style="width:${pc(n)}%;background:${c}" title="${who}: ${fmtInt(n)} votes"></span>` : "");
+    const side = (p, n) => `<ul class="tug-lines ${p === "D" ? "dem" : "gop"}"><li><b class="mg ${p === "D" ? "d" : "r"} pop-pc">${pc(n).toFixed(1)}%</b></li><li>${fmtInt(n)}</li></ul>`;
+    const share = counted != null ? pctShort({ pct: counted, pct_of: "" }) : "";
+    return `${heading ? `<h3>Popular vote${live ? " so far" : ""}</h3>` : ""}<div class="tug pop">
+      <div class="tug-foot">${side("D", v[0])}${side("R", v[1])}</div>
+      <div class="bar ev-bar tug-bar" style="--need:0.5">${seg(v[0], colors.demSolid, CAUCUS_NAME.D)}<i class="gap"></i>${seg(v[1], colors.gopSolid, CAUCUS_NAME.R)}<i class="need" title="Half the vote"></i></div>
+      ${other > 0 ? `<p class="note">Others: ${pc(other).toFixed(1)}%, ${fmtInt(other)} votes</p>` : ""}
+      <p class="note">${fmtInt(v[2])} votes${live ? " counted" : ""}${share}</p></div>`;
+  }
+  // past years: [held before, won] per seat -> the same counts as gains() gives for tonight
+  function pastGains(pairs, why = "") {
+    const z = () => ({ D: 0, R: 0, I: 0 });
+    const g = { won: z(), lost: z(), lead: z(), leadLost: z(), unknown: 0, any: false, why };
+    for (const [held, w] of pairs) {
+      if (!held) { g.unknown++; continue; }
+      g.any = true;
+      if (held !== w) { g.won[w]++; g.lost[held]++; }
+    }
+    return g;
+  }
+  // a House district changed party when the same district (the state kept its map) went the other way
+  function houseGains(y, only = null) {
+    if (!extra.house.races[String(+y - 2)]) return pastGains([]);
+    return pastGains(Object.entries(extra.house.races[y]).filter(([id]) => !only || id.startsWith(only + "-"))
+      .map(([, r]) => [r.held, r.cands[0].caucus]), `new map since ${+y - 2}`);
   }
   function senateHistory(st) {
     const items = [];
@@ -1135,30 +1177,25 @@
     const races = Object.entries(hRaces()).filter(([id]) => id.startsWith(st + "-")).sort();
     const won = { D: 0, R: 0, I: 0 };
     races.forEach(([, r]) => won[r.cands[0].caucus]++);
-    const lead = won.D >= won.R ? "D" : "R", other = lead === "D" ? "R" : "D";
-    let text = `${CAUCUS_NAME[lead]} won ${won[lead]} of ${races.length} seats` + (won[other] ? `, ${CAUCUS_NAME[other]} ${won[other]}.` : ".");
+    // the same bar as the country view: seats won in this state's delegation, and seats that changed party
+    const t = {};
+    for (const p of ["D", "R", "I"]) t[p] = { solid: won[p], lead: 0, lines: [`${won[p]} won`] };
     const items = races.map(([id, r]) => `<li><button type="button" data-dist="${id}"><span class="what">${districtName(id, true)}</span>
       <span class="who">${r.cands[0].name}${partyTag(r.cands[0])}</span>${leanLabel(raceLean(r))}</button></li>`);
-    return `<p class="summary">${text}</p><h3>Districts</h3><ul class="race-list">${items.join("")}</ul>`;
+    return `${tugBar(t, races.length, "", houseGains(String(state.year), st), "districts")}${popSection(houseVotes(races.map(([, r]) => r)))}<h3>Districts</h3><ul class="race-list">${items.join("")}</ul>`;
   }
 
   function drawCongressPanel() {
     if (isLive()) return drawLivePanel();
     const s = state.sel, y = String(state.year), sen = state.office === "senate", st = stateOf(s);
-    const office = sen ? "Senate" : "House";
     let html;
     if (s.type === "nation") {
-      html = `<h2>United States</h2><p class="where">${office}, ${y}</p>
-        <div class="mode vote-toggle" role="radiogroup" aria-label="National result">
-        <button type="button" role="radio" aria-checked="${state.vote === "ec"}" data-vote="ec">Seats</button>
-        <button type="button" role="radio" aria-checked="${state.vote === "popular"}" data-vote="popular">Popular vote</button></div>`;
-      html += state.vote === "ec" ? (sen ? senateSeatsBody(y) : houseSeatsBody(y)) : popularBody(y);
+      // seats and the popular vote together; the map's Winner | Margin control is separate
+      html = headline(sen ? "senate" : "house", s, y) + (sen ? senateSeatsBody(y) : houseSeatsBody(y));
     } else if (sen) {
       const rs = senateRaces(st), r = senateRace(st);
       const kind = r && rs.length > 1 ? (r.seat === "special" ? ", special election" : ", regular election") : r && r.seat === "special" ? ", special election" : "";
-      html = s.type === "state"
-        ? `<h2>${data.states[st].name}</h2><p class="where">Senate, ${y}${kind}</p>`
-        : `<h2>${data.counties[s.id]?.name ?? "Unknown"}</h2><p class="where">${data.states[st].name} · Senate, ${y}${kind}</p>`;
+      html = headline("senate", s, `${y}${kind}`);
       if (rs.length > 1) {
         html += `<div class="mode tabs" role="radiogroup" aria-label="Race">${rs.map(x =>
           `<button type="button" role="radio" aria-checked="${x === r}" data-seat="${x.seat}">${x.seat === "special" ? "Special election" : "Regular election"}</button>`).join("")}</div>`;
@@ -1168,10 +1205,10 @@
       html += senateHistory(st);
     } else if (s.type === "district" || atLarge(st)) {
       const id = s.type === "district" ? s.id : `${st}-00`, r = hRaces()[id];
-      html = `<h2>${districtName(id)}</h2><p class="where">House, ${y}</p>` + (r ? raceBody(r) : `<p class="empty">No result.</p>`);
+      html = headline("house", { type: "district", id }, y) + (r ? raceBody(r) : `<p class="empty">No result.</p>`);
     } else {
       const n = Object.keys(hRaces()).filter(id => id.startsWith(st + "-")).length;
-      html = `<h2>${data.states[st].name}</h2><p class="where">House, ${y} · ${n} districts</p>` + houseStateBody(st);
+      html = headline("house", s, `${y} · ${n} districts`) + houseStateBody(st);
     }
     const actions = [];
     if ((s.type === "county" && !SINGLE.has(st)) || (s.type === "district" && !atLarge(st))) actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
@@ -1181,7 +1218,6 @@
 
     panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () =>
       select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
-    panel.querySelectorAll("[data-vote]").forEach(b => b.addEventListener("click", () => setVote(b.dataset.vote)));
     panel.querySelectorAll(".tabs [data-seat]").forEach(b => b.addEventListener("click", () => {
       state.seat = b.dataset.seat;
       state.round = null;
@@ -1204,13 +1240,31 @@
   const clock = iso => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
   const isClosed = r => Date.now() >= Date.parse(r.polls_close);
   const counted = r => !!(r.rounds && r.rounds.length && r.rounds[0].total);
+  // who held the seat: the winner of the last election for it (r.prev; Senate seats, and House
+  // districts whose map did not change); a called race won by the other side is a pickup
+  function heldBy(r) {
+    const p = r.prev;
+    if (!p || !p.cands || !p.cands.length) return null;
+    return p.cands.reduce((a, b) => (b.votes > a.votes ? b : a));
+  }
+  function pickup(r) {
+    if (!r || !r.call || r.call.winner == null) return null;
+    const held = heldBy(r), won = r.cands[r.call.winner];
+    return held && held.caucus !== won.caucus ? { won, held, year: r.prev.year } : null;
+  }
   function liveFill(r) {
     if (!r) return colors.nodata;
-    if (r.call && r.call.winner != null) return colors[ckey(r.cands[r.call.winner].caucus) + "Solid"];
+    if (state.cmap === "margin") return counted(r) ? leanColor(raceLean(r)) : colors.pending;
+    if (r.call && r.call.winner != null) {
+      const c = ckey(r.cands[r.call.winner].caucus);
+      return pickup(r) ? `url(#flip-${c})` : colors[c + "Solid"];
+    }
     if (!counted(r)) return colors.pending;
-    return leanColor(raceLean(r));
+    return colors[ckey(raceLean(r).caucus)][1]; // leading, not called: one light shade
   }
-  const pctText = r => (r.pct == null ? "" : `${r.pct < 1 && r.pct > 0 ? "<1" : Math.round(r.pct)}% ${r.pct_of && r.pct_of.startsWith("precincts") ? "of precincts reporting" : r.pct_of && r.pct_of.startsWith("polling") ? "of polling places reporting" : "counted"}`);
+  const pctText = r => (r.pct == null ? "" : `${r.pct < 1 && r.pct > 0 ? "<1" : Math.round(r.pct)}% ${r.pct_of && r.pct_of.startsWith("precincts") ? "of precincts reporting" : r.pct_of && r.pct_of.startsWith("polling") ? "of polling places reporting" : r.pct_of && r.pct_of.startsWith("counties") ? "of counties fully reported" : "counted"}`);
+  // " (85%)" after a vote count; the hover says what the share is of (votes, precincts, counties)
+  const pctShort = r => (r.pct == null ? "" : ` <span title="${pctText(r)}">(${r.pct < 1 && r.pct > 0 ? "<1" : Math.round(r.pct)}%)</span>`);
   function liveStatus(r) {
     if (r.call && r.call.winner != null) return `Called for ${r.cands[r.call.winner].name} by ${r.call.by}`;
     if (counted(r)) return pctText(r) || "Counting";
@@ -1227,18 +1281,27 @@
     const b = BINS.margin;
     const swatch = arr => arr.map(c => `<span style="background:${c}"></span>`).join("");
     const box = fill => `<svg class="sw" viewBox="0 0 26 10" aria-hidden="true"><rect width="26" height="10" fill="${fill}"/></svg>`;
-    el.innerHTML = `<span>Republican +50</span><span class="ramp">${swatch([...colors.gop].reverse()) + swatch(colors.dem)}</span><span>Democratic +50</span>
-      <span>Leader's margin in the votes counted so far; steps at ${b.map(x => x * 100).join(", ")} points. Solid color once a race is called.</span>
-      <span class="key">${box(colors.pending)}No votes counted yet</span><span class="key">${box(colors.nodata)}No race followed</span>`;
+    // races with no earlier result can't be pickups: say how many, under the legend
+    const rs = state.office === "house" ? Object.values(hRaces()) : liveRaces();
+    const star = flipNote(rs.filter(r => !heldBy(r)).length, rs.some(r => heldBy(r)), state.office === "house" ? "districts" : "races",
+      state.office === "house" ? "new maps since 2024" : "");
+    const rest = `<span class="key">${box(colors.pending)}No votes counted yet</span><span class="key">${box(colors.nodata)}No race followed</span>`;
+    el.innerHTML = state.cmap === "margin"
+      ? `<span>Republican +50</span><span class="ramp">${swatch([...colors.gop].reverse()) + swatch(colors.dem)}</span><span>Democratic +50</span>
+      <span>Leader's margin in the votes counted so far, called or not; steps at ${b.map(x => x * 100).join(", ")} points.</span>${rest}`
+      : `<span class="key">${box(colors.demSolid)}${box(colors.gopSolid)}Won (called)</span>
+      <span class="key">${box(colors.dem[1])}${box(colors.gop[1])}Leading</span>
+      <span class="key">${box("url(#flip-dem)")}${box("url(#flip-gop)")}<span title="Called, and the seat changes party">Pickup${star ? "*" : ""}</span></span>${rest}${star}`;
   }
   function liveYearLabel() {
     const night = extra.live?.night, called = night?.senate_calls || { D: 0, R: 0, I: 0 };
     const n = called.D + called.R + called.I;
     const upd = liveFile()?.updated || liveFile("senate")?.updated;
-    const up = upd ? `updated ${clock(upd)}` : "live tonight";
     const on = !!night?.counting;
-    const tag = `<span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>`;
-    return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""} · ` : ""}${up}</span>`;
+    // the update time sits next to the Live tag, so the narrow card's second line has room for the calls
+    const time = upd ? `<span class="live-time" title="Results updated at ${clock(upd)}">${clock(upd)}</span>` : "";
+    const tag = `<span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live${time}</span>`;
+    return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""}` : "live tonight"}</span>`;
   }
   function liveSource(r) {
     if (!r.source) return "";
@@ -1248,26 +1311,37 @@
     if (r.stale) t += ` <strong>Not refreshed for a while; numbers may be behind.</strong>`;
     return `<p class="note">${t}</p>`;
   }
+  const PARTY_ADJ = { D: "Democratic", R: "Republican", I: "Independent" };
+  function pickupText(r) {
+    const k = pickup(r);
+    return k ? `<p class="note"><strong>${PARTY_ADJ[k.won.caucus][0].toUpperCase() + PARTY_ADJ[k.won.caucus].slice(1)} pickup</strong> · ${CAUCUS_NAME[k.held.caucus]} held this seat (${k.held.name}, ${k.year})</p>` : "";
+  }
   function livePrev(r) {
     const p = r.prev;
-    if (!p) return r.office === "governor" ? "" : "";
+    if (!p) return "";
     const order = p.cands.map((c, i) => i).sort((a, b) => p.cands[b].votes - p.cands[a].votes);
     const w = p.cands[order[0]], l = lean(p.cands, p.cands.map(c => c.votes), p.total);
-    return `<h3>Last time for this seat</h3><ul class="race-list"><li><button type="button" data-prev-year="${p.year}" data-prev-seat="${p.seat}">
-      <span class="what">${p.year}${p.seat === "special" ? " sp." : ""}</span><span class="who">${w.name}${partyTag(w)}</span>${leanLabel(l)}</button></li></ul>`;
+    const row = `<span class="what">${p.year}${p.seat === "special" ? " sp." : ""}</span><span class="who">${w.name}${partyTag(w)}</span>${leanLabel(l)}`;
+    // governor history has no page of its own yet, so its row is not a link
+    return r.office === "governor"
+      ? `<h3>Last time</h3><ul class="race-list"><li><div class="prev-row">${row}</div></li></ul><p class="note">${p.year} result: MIT Election Data and Science Lab, precinct returns summed to the state.</p>`
+      : `<h3>Last time for this seat</h3><ul class="race-list"><li><button type="button" data-prev-year="${p.year}" data-prev-seat="${p.seat}">${row}</button></li></ul>`;
   }
   function liveRaceBody(r, id = r.id) {
     let html = r.test ? `<p class="test-flag">Test data, not real results</p>` : "";
     if (!counted(r)) {
-      html += `<div class="cand">${r.cands.map(c => personRow(c, 0, 0, false)).join("")}</div><p class="summary">${liveStatus(r)}.</p>`;
+      const called = r.call && r.call.winner != null;
+      html += `<div class="cand">${r.cands.map((c, i) => personRow(c, 0, 0, called && i === r.call.winner)).join("")}</div>
+        <p class="note">${called ? `Called by ${r.call.by}` : liveStatus(r)}</p>${called ? pickupText(r) : ""}`;
     } else {
       const rd = roundOf(r), l = raceLean(r), called = r.call && r.call.winner != null;
       html += `<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, called ? 0 : -1)}</div>`;
-      const lead = r.cands[l.lead];
-      const sum = called ? `${r.cands[0].name} won. Called by ${r.call.by} at ${clock(r.call.at)}.`
-        : `${lead.name} leads ${byText(l)}.`;
-      html += `<p class="summary">${sum} ${pctText(r) ? pctText(r) + "." : ""} ${fmtInt(rd.total)} votes counted.</p>`;
-      html += `<div class="trail" data-trail="${id}"></div>`;
+      // the bars say who won or leads; the grey lines say who called it and how much is counted
+      const facts = [called ? `Called by ${r.call.by}` : "", `${fmtInt(rd.total)} votes counted${pctShort(r)}`].filter(Boolean);
+      html += `<p class="note">${facts.join(" · ")}</p>${called ? pickupText(r) : ""}`;
+      // the source sits with the numbers it gave, above the chart
+      html += liveSource(r) + `<div class="trail" data-trail="${id}"></div>`;
+      return html + livePrev(r);
     }
     return html + liveSource(r) + livePrev(r);
   }
@@ -1276,7 +1350,7 @@
     if (!v || !v[n + 1]) return `<p class="empty">No votes counted in this county yet.</p>${liveSource(r)}`;
     const l = countyLean(r, fips), cp = r.county_pct?.[fips];
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], -1)}</div>
-      <p class="summary">${r.cands[l.lead].name} leads the county ${byText(l)}.${cp != null ? ` ${Math.round(cp)}% ${r.pct_of && r.pct_of.startsWith("precincts") ? "of precincts reporting" : "counted"}.` : ""} ${fmtInt(v[n + 1])} votes counted.</p>${liveSource(r)}`;
+      <p class="summary">${r.cands[l.lead].name} leads the county ${byText(l)}.${cp != null ? ` ${Math.round(cp)}% ${r.pct_of && (r.pct_of.startsWith("precincts") || r.pct_of.startsWith("counties")) ? "of precincts reporting" : "counted"}.` : ""} ${fmtInt(v[n + 1])} votes counted.</p>${liveSource(r)}`;
   }
   // Senate balance tonight: seats not up (won in 2022/2024, current holder) + called + leading
   function senateBalance() {
@@ -1289,26 +1363,76 @@
     }
     return b;
   }
+  // One bar per office: Democrats fill from the left, Republicans from the right, solid = won (and,
+  // for the Senate, not up), light = leading; others next to the Democrats; grey = no votes yet.
+  // t[p] = { solid, lead, lines: [...] }; need = control marker text or null;
+  // races = live races for pickups, or a gains object already counted (past years).
+  function tugBar(t, total, needText, races, what, under = "") {
+    const n = p => (t[p] ? t[p].solid + t[p].lead : 0);
+    const seg = (k, c, w) => (k ? `<span style="width:${(k / total) * 100}%;background:${c}" title="${w}: ${k}"></span>` : "");
+    const segs = p => [seg(t[p]?.solid, colors[ckey(p) + "Solid"], t[p]?.solidText || "Won"), seg(t[p]?.lead, colors[ckey(p)][1], "Leading")];
+    const [ds, dl] = segs("D"), [is_, il] = segs("I"), [rs, rl] = segs("R");
+    // big number: certain seats only (won, and not up); leads are the light part of the bar and
+    // the "leading" line under it
+    const num = p => `<span class="tug-num"><b title="${t[p].solidText || "Won"}">${t[p].solid}</b></span>`;
+    const g = Array.isArray(races) ? gains(races) : races;
+    const arrows = p => {
+      // called races only; leads in the other party's seats go in the hover text
+      const lead = k => (k ? ` Not yet called: ahead in ${k} more.` : "");
+      return `<li class="up" title="Won ${g.won[p]} ${what} the other party held before.${lead(g.lead[p])}"><span class="gain">▲ ${g.won[p]}</span></li>
+        <li class="down" title="Lost ${g.lost[p]} ${what} this party held before.${lead(g.leadLost[p]).replace("ahead", "behind")}"><span class="loss">▼ ${g.lost[p]}</span></li>`;
+    };
+    // each line keyed to its part of the bar: solid swatch for won (and not up), light for leading
+    const sw = (p, l) => `<i class="sw" style="background:${l.endsWith("leading") ? colors[ckey(p)][1] : colors[ckey(p) + "Solid"]}"></i>`;
+    // drop "0 leading"; when all that is left is "N won", the big counts already say it
+    const shown = p => t[p].lines.filter(l => l !== "0 leading");
+    const needLines = ["D", "R"].some(p => shown(p).some(l => !l.endsWith(" won")));
+    const side = p => `<ul class="tug-lines ${p === "D" ? "dem" : "gop"}">${shown(p).map(l => `<li>${p === "R" ? l + sw(p, l) : sw(p, l) + l}</li>`).join("")}</ul>`;
+    const gainSide = p => `<ul class="tug-lines tug-gains-side ${p === "D" ? "dem" : "gop"}">${arrows(p)}</ul>`;
+    const other = n("I") ? `<p class="tug-other">${CAUCUS_NAME.I}: ${n("I")} (${t.I.lines.join(", ")})</p>` : "";
+    return `<div class="tug">
+      <div class="tug-head"><span class="dem">${partyAvatar("D", colors.demSolid)}<span class="tug-who">${num("D")}<span class="pname" data-short="${SHORT_NAME.D}" data-full="${CAUCUS_NAME.D}">${CAUCUS_NAME.D}</span></span></span><span class="gop"><span class="tug-who">${num("R")}<span class="pname" data-short="${SHORT_NAME.R}" data-full="${CAUCUS_NAME.R}">${CAUCUS_NAME.R}</span></span>${partyAvatar("R", colors.gopSolid)}</span></div>
+      ${g.any ? `<div class="tug-foot tug-gains">${gainSide("D")}${gainSide("R")}</div>` : ""}
+      <div class="bar ev-bar tug-bar" style="--need:0.5">${ds}${dl}${is_}${il}<i class="gap"></i>${rl}${rs}${needText != null ? `<i class="need" title="${needText || "Half the seats"}"></i>` : ""}</div>
+      ${needText ? `<p class="tug-need">${needText}</p>` : ""}
+      ${needLines ? `<div class="tug-foot">${side("D")}${side("R")}</div>` : ""}${under}${other}</div>`;
+  }
+  // Seats changing party: called pickups (won/lost) and leads in seats the other party held last time
+  function gains(races) {
+    const z = () => ({ D: 0, R: 0, I: 0 });
+    const g = { won: z(), lost: z(), lead: z(), leadLost: z(), unknown: 0, any: false };
+    for (const r of races) {
+      const held = heldBy(r);
+      if (!held) { g.unknown++; continue; }
+      g.any = true;
+      const called = r.call && r.call.winner != null;
+      const c = called ? r.cands[r.call.winner].caucus : counted(r) ? raceLean(r).caucus : null;
+      if (!c || c === held.caucus) continue;
+      (called ? g.won : g.lead)[c]++;
+      (called ? g.lost : g.leadLost)[held.caucus]++;
+    }
+    return g;
+  }
   function senateBalanceBody() {
     const notUp = liveFile("senate")?.notUp;
     if (!notUp) return "";
     const b = senateBalance();
-    const tot = p => b[p].notUp + b[p].called + b[p].leading;
-    const order = (tot("R") > tot("D") ? ["R", "D"] : ["D", "R"]).concat(tot("I") ? ["I"] : []);
-    const row = p => {
-      const solid = colors[ckey(p) + "Solid"], light = colors[ckey(p)][1], x = b[p], need = p === "R" ? 50 : p === "D" ? 51 : null;
-      const seg = (n, c, t) => (n ? `<span style="width:${n}%;background:${c}" title="${t}: ${n}"></span>` : "");
-      // independents who caucus with neither party (e.g. Dan Osborn) get their own row
-      return `<div class="cand-row">${partyAvatar(p, solid)}<div class="cand-main"><span class="name">${CAUCUS_NAME[p]}</span><span class="pct">${tot(p)}</span>
-        <div class="bar ev-bar stacked" style="--need:${(need || 0) / 100}">${seg(x.notUp + x.called, solid, "Not up or called")}${seg(x.leading, light, "Leading")}${need ? `<i class="need" title="${need} for control"></i>` : ""}</div>
-        <span class="votes">${x.notUp} not up · ${x.called} won · ${x.leading} leading</span></div></div>`;
-    };
-    const before = notUp.before;
+    const t = {};
+    // independents who caucus with neither party (e.g. Dan Osborn) sit next to the Democrats
+    for (const p of ["D", "R", "I"]) t[p] = { solid: b[p].notUp + b[p].called, lead: b[p].leading, solidText: "Not up or won",
+      lines: [`${b[p].notUp} not up`, `${b[p].called} won`, `${b[p].leading} leading`] };
     const changed = (notUp.seats || []).filter(x => x.note);
-    return `<div class="cand">${order.map(row).join("")}</div>
-      <p class="summary">${b.pending ? `${b.pending} of 35 races have no votes counted yet. ` : ""}Before tonight: Republicans ${before.R}, Democrats ${before.D}${before.I ? `, others ${before.I}` : ""}.</p>
-      <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties. Light bars are leads in the votes counted so far, not wins; a race counts as won only once a news organization has called it.</li>
+    return `${tugBar(t, 100, "51 for control (50 for Republicans)", liveRaces("senate"), "seats")}
+      <ul class="notes"><li>Control needs 51 seats, or 50 for Republicans, because the vice president (JD Vance) breaks ties.</li>
       <li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
+      ${popSection(senatePopular(null, liveRaces("senate")), true)}<p class="note">${SENATE_POP_NOTE.replace("this year's", "tonight's")}</p>
+      <h3>Races</h3>`;
+  }
+  // governors: only tonight's races (we have no list of the governors not up)
+  function governorTallyBody(rs) {
+    const x = liveHouseTally(rs), t = {};
+    for (const p of ["D", "R", "I"]) t[p] = { solid: x.won[p], lead: x[p] - x.won[p], lines: [`${x.won[p]} won`, `${x[p] - x.won[p]} leading`] };
+    return `${tugBar(t, rs.length, null, rs, "seats")}
       <h3>Races</h3>`;
   }
   function liveNationBody() {
@@ -1322,7 +1446,7 @@
         <span class="who">${who}${l && !(r.call && r.call.winner != null) ? ` <span class="muted">· ${pctText(r).replace(/ of .*| counted/, "")}</span>` : ""}</span>${l ? leanLabel(l) : ""}</button></li>`;
     });
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}${state.office === "senate" ? senateBalanceBody() : ""}<p class="summary">${liveFile()?.updated ? `Updated ${clock(liveFile().updated)}.` : ""} Listed by poll closing time. A race is marked won only after a news organization calls it.</p>
+    return `${test}${state.office === "senate" ? senateBalanceBody() : governorTallyBody(rs)}
       <ul class="race-list">${items.join("")}</ul>`;
   }
   // footer: name the official sources the live results come from right now
@@ -1341,12 +1465,10 @@
     const s = state.sel, st = stateOf(s);
     let html;
     if (s.type === "nation") {
-      html = `<h2>United States</h2><p class="where">Election night, 3 November 2026</p>` + liveNationBody();
+      html = headline(state.office, s, liveWhen()) + liveNationBody();
     } else {
       const rs = senateRaces(st), r = senateRace(st);
-      html = s.type === "state"
-        ? `<h2>${data.states[st].name}</h2><p class="where">${r ? seatLabel(r) + ", 2026" : "2026"}</p>`
-        : `<h2>${data.counties[s.id]?.name ?? "Unknown"}</h2><p class="where">${data.states[st].name} · ${r ? seatLabel(r) : ""}, 2026</p>`;
+      html = headline(state.office, s, liveWhen(), r?.seat === "special");
       if (rs.length > 1) {
         html += `<div class="mode tabs" role="radiogroup" aria-label="Race">${rs.map(x =>
           `<button type="button" role="radio" aria-checked="${x === r}" data-seat="${x.seat}">${seatLabel(x)}</button>`).join("")}</div>`;
@@ -1379,6 +1501,7 @@
       setYear(+b.dataset.prevYear);
     }));
     fillTrail();
+    fitPartyNames();
   }
   // ---------- the race through the night (web/data/live/trail-<office>.json) ----------
   // Loaded only when a race panel is open, and again only when the office file says the chart
@@ -1476,46 +1599,51 @@
         <g class="mark" visibility="hidden"><line y1="${top}" y2="${h - bottom}"/><circle r="3.5"/></g>
         <rect x="${left}" y="0" width="${w - left - right}" height="${h}" fill="transparent"/>
       </svg><div class="tip trail-tip" hidden></div>
-      <p class="note">${ca.last || ca.name}'s lead over ${cb.last || cb.name}, in points of the votes counted so far, each time the source updated (your time zone).${switches ? " Dashed line: a change of source." : ""}${trails[liveOffice(state.office)]?.test ? " Test data." : ""}</p>`;
+      ${switches || trails[liveOffice(state.office)]?.test ? `<p class="note">${switches ? "Dashed line: a change of source." : ""}${trails[liveOffice(state.office)]?.test ? " Test data." : ""}</p>` : ""}`;
   }
 
   // ---------- live House: 435 races, leaders only (no calls) ----------
+  // per caucus: seats won (called by hand, with who called them) and seats leading
   function liveHouseTally(races) {
-    const t = { D: 0, R: 0, I: 0, none: 0 };
-    for (const r of races) { const l = counted(r) ? raceLean(r) : null; if (l) t[l.caucus]++; else t.none++; }
+    const t = { D: 0, R: 0, I: 0, none: 0, won: { D: 0, R: 0, I: 0 } };
+    for (const r of races) {
+      if (r.call && r.call.winner != null) { const c = r.cands[r.call.winner].caucus; t[c]++; t.won[c]++; continue; }
+      const l = counted(r) ? raceLean(r) : null;
+      if (l) t[l.caucus]++; else t.none++;
+    }
     return t;
   }
   function liveHouseNationBody() {
     const rs = Object.values(hRaces());
     if (!rs.length) return `<p class="empty">No House results yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
-    const t = liveHouseTally(rs);
-    const row = (p, n) => `<div class="cand-row">${partyAvatar(p, colors[ckey(p) + "Solid"])}<div class="cand-main"><span class="name">${CAUCUS_NAME[p]} leading</span><span class="pct">${n}</span>
-      <div class="bar ev-bar" style="--need:${218 / 435}"><span style="width:${(n / 435) * 100}%;background:${colors[ckey(p) + "Solid"]}"></span><i class="need" title="218 for a majority"></i></div>
-      <span class="votes">${n} of 435 districts</span></div></div>`;
+    const x = liveHouseTally(rs), t = {};
+    for (const p of ["D", "R"]) t[p] = { solid: x.won[p], lead: x[p] - x.won[p], lines: [`${x.won[p]} won`, `${x[p] - x.won[p]} leading`] };
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}<div class="cand">${row("D", t.D)}${row("R", t.R)}</div>
-      <p class="summary">${t.none ? `${t.none} districts have no votes counted yet. ` : ""}${t.I ? `Other candidates lead in ${t.I}. ` : ""}A majority needs 218 seats.</p>
-      <p class="note">Leading means ahead in the votes counted so far. House races are not marked as called here.</p>`;
+    return `${test}${tugBar(t, 435, "218 for a majority", rs, "districts")}${popSection(houseVotes(rs), true)}
+`;
   }
   function drawLiveHousePanel() {
     const s = state.sel, st = stateOf(s), races = hRaces();
     let html;
     if (s.type === "nation") {
-      html = `<h2>United States</h2><p class="where">House, election night, 3 November 2026</p>` + liveHouseNationBody();
+      html = headline("house", s, liveWhen()) + liveHouseNationBody();
     } else if (s.type === "district" || atLarge(st)) {
       const id = s.type === "district" ? s.id : `${st}-00`, r = races[id];
-      html = `<h2>${districtName(id)}</h2><p class="where">House, 2026</p>` + (r ? liveRaceBody(r, id) + notesList(r.notes) : `<p class="empty">No result.</p>`);
+      html = headline("house", { type: "district", id }, liveWhen()) + (r ? liveRaceBody(r, id) + notesList(r.notes) : `<p class="empty">No result.</p>`);
     } else {
       const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-")).sort();
       const t = liveHouseTally(ds.map(([, r]) => r));
       const items = ds.map(([id, r]) => {
-        const l = counted(r) ? raceLean(r) : null;
+        const l = counted(r) ? raceLean(r) : null, won = r.call && r.call.winner != null ? r.cands[r.call.winner] : null;
+        const who = won ? `${won.name}${partyTag(won)} <span class="won">${CHECK}<span class="sr">won</span></span>`
+          : l ? `${r.cands[l.lead].name}${partyTag(r.cands[l.lead])}` : `<span class="muted">${liveStatus(r)}</span>`;
         return `<li><button type="button" data-dist="${id}"><span class="what">${districtName(id, true)}</span>
-          <span class="who">${l ? `${r.cands[l.lead].name}${partyTag(r.cands[l.lead])}` : `<span class="muted">${liveStatus(r)}</span>`}</span>${l ? leanLabel(l) : ""}</button></li>`;
+          <span class="who">${who}</span>${l ? leanLabel(l) : ""}</button></li>`;
       });
-      const lead = ["D", "R", "I"].filter(c => t[c]).map(c => `${CAUCUS_NAME[c]} ${t[c]}`).join(", ");
-      html = `<h2>${data.states[st].name}</h2><p class="where">House, 2026 · ${ds.length} districts</p>
-        <p class="summary">${lead ? `Leading: ${lead}.` : "No votes counted yet."}</p>${notesList(ds[0]?.[1].notes)}
+      const tt = {};
+      for (const p of ["D", "R", "I"]) tt[p] = { solid: t.won[p], lead: t[p] - t.won[p], lines: [`${t.won[p]} won`, `${t[p] - t.won[p]} leading`] };
+      html = `${headline("house", { type: "state", id: st }, `${liveWhen()} · ${ds.length} districts`)}
+        ${tugBar(tt, ds.length, "", ds.map(([, r]) => r), "districts")}${t.none ? `<p class="tug-other">${t.none} with no votes counted yet.</p>` : ""}${popSection(houseVotes(ds.map(([, r]) => r)), true)}${notesList(ds[0]?.[1].notes)}
         <h3>Districts</h3><ul class="race-list">${items.join("")}</ul>`;
     }
     const actions = [];
@@ -1528,6 +1656,7 @@
     panel.querySelectorAll("[data-dist]").forEach(b => b.addEventListener("click", () => select({ type: "district", id: b.dataset.dist }, true)));
     panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => setYear(+b.dataset.prevYear)));
     fillTrail();
+    fitPartyNames();
   }
 
   // re-read the results file every 30 seconds; redraw only when it changed
@@ -1687,11 +1816,15 @@
       b.setAttribute("aria-disabled", String(!ok));
       b.title = ok ? "" : WHY_NOT[o](state.year);
     });
-    document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
+    const shown = state.mode === "shift" ? "shift" : state.level === "counties" ? "margin" : state.cmap;
+    document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === shown)));
     document.querySelectorAll("[data-level]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.level === state.level)));
     // Senate and House show the margin only (no Shift yet); the House map is by district
     document.querySelector("[data-mode]").parentElement.hidden = !pres;
     document.getElementById("level-toggle").hidden = state.office === "house";
+    document.querySelectorAll("[data-cmap]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.cmap === state.cmap)));
+    // Winner | Margin: Senate, House and governor maps of races (not county figures)
+    document.getElementById("cmap-toggle").hidden = pres || (state.office !== "house" && state.level === "counties");
     arrowsBtn.hidden = !pres || state.mode !== "shift";
     // footer: only the sources of what is on screen (plus the lines every view needs)
     const view = isLive() ? "live" : state.office;
@@ -1718,8 +1851,14 @@
     drawArrows();
     writeHash();
   });
+  // president: Winner | Margin | Shift in one control (Winner and Margin share the margin view)
   function setMode(m) {
-    state.mode = m;
+    if (m === "shift") state.mode = "shift";
+    else {
+      state.mode = "margin";
+      state.cmap = m;
+      if (m === "winner" && state.level === "counties") state.level = "states"; // Winner colors states
+    }
     syncToggles();
     drawMap();
     drawPanel();
@@ -1731,11 +1870,11 @@
     drawMap();
     writeHash();
   }
-  function setVote(v) {
-    state.vote = v;
+  function setCmap(c) {
+    state.cmap = c;
+    syncToggles();
     drawMap();
     drawYears();
-    drawPanel();
     writeHash();
   }
   function drawHeadline() {
@@ -1763,6 +1902,7 @@
   document.querySelectorAll("[data-office]").forEach(b => b.addEventListener("click", () => setOffice(b.dataset.office)));
   document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
   document.querySelectorAll("[data-level]").forEach(b => b.addEventListener("click", () => setLevel(b.dataset.level)));
+  document.querySelectorAll("[data-cmap]").forEach(b => b.addEventListener("click", () => setCmap(b.dataset.cmap)));
   document.getElementById("reset").addEventListener("click", () => select({ type: "nation" }, true));
   document.addEventListener("keydown", e => {
     if (e.target.closest("select, input, textarea")) return;
@@ -1813,7 +1953,7 @@
     p.set("year", state.year);
     if (state.mode !== "margin") p.set("view", state.mode);
     if (state.level !== "states") p.set("map", state.level);
-    if (state.vote !== "ec") p.set("vote", state.vote);
+    if (state.cmap !== "winner") p.set("color", state.cmap);
     if (state.arrows) p.set("arrows", "on");
     if (state.sel.type !== "nation") p.set("place", state.sel.id);
     if (state.seat !== "regular") p.set("seat", state.seat);
@@ -1822,10 +1962,10 @@
   // early: read only the office and year, so their data can be loaded before the rest is checked
   function readHash(early = false) {
     const h = location.hash.slice(1);
-    let y, m, id, lv, vt, race, seat;
+    let y, m, id, lv, vt, race, seat, cm;
     if (h.includes("=")) {
       const p = new URLSearchParams(h);
-      [y, m, id, lv, vt, race, seat] = ["year", "view", "place", "map", "vote", "race", "seat"].map(k => p.get(k));
+      [y, m, id, lv, vt, race, seat, cm] = ["year", "view", "place", "map", "vote", "race", "seat", "color"].map(k => p.get(k));
       state.arrows = p.get("arrows") === "on";
     } else {
       [y, m, id] = h.split("/"); // older links: #2024/margin/48201
@@ -1844,7 +1984,8 @@
     state.mode = pres && m === "shift" ? "shift" : "margin";
     if (!pres) state.arrows = false;
     state.level = lv === "counties" && state.office !== "house" ? "counties" : "states";
-    state.vote = vt === "popular" ? "popular" : "ec";
+    // older links: vote=popular (the panel's Popular vote tab) also colored the map by margin
+    state.cmap = cm === "margin" || vt === "popular" ? "margin" : "winner";
     state.seat = seat === "special" || seat === "governor" ? seat : "regular";
     state.round = null;
     if (id && id.length === 2 && data.states[id]) state.sel = { type: "state", id };

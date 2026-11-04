@@ -16,6 +16,8 @@
   --ind: #7d52a8; /* independents who do not caucus with either party, and other parties */
   --grn: #2e8540; /* Green Party */
   --lib: #b08800; /* Libertarian Party */
+  --gain: #1e7b45; /* seats gained (▲) */
+  --loss: #b3261e; /* seats lost (▼) */
   --pending: #c3cad2; /* live: polls closed or closing, no votes yet */
   --neutral: #f1edef;
   --nodata: #dfe3e8;
@@ -38,6 +40,8 @@
     --ind: #a987d8;
   --grn: #4fb36a;
   --lib: #e0b62e;
+  --gain: #4cc27a;
+  --loss: #f0715f;
   --pending: #3d4855;
     --neutral: #2a2f36;
     --nodata: #252c34;
@@ -58,6 +62,8 @@
   --ind: #a987d8;
   --grn: #4fb36a;
   --lib: #e0b62e;
+  --gain: #4cc27a;
+  --loss: #f0715f;
   --pending: #3d4855;
   --neutral: #2a2f36;
   --nodata: #252c34;
@@ -240,6 +246,7 @@ h1 {
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .years .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .years .live-tag.on { color: var(--gop); }
+.years .live-time { margin-left: 4px; color: var(--muted); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .years .live-tag.on .live-dot { background: var(--gop); animation: live-pulse 1.6s ease-in-out infinite; }
 @keyframes live-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gop) 60%, transparent); }
@@ -395,6 +402,7 @@ h1 {
   flex-wrap: wrap;
 }
 
+.legend-note { flex-basis: 100%; font-size: 12px; }
 .legend .ramp { display: flex; }
 .legend .key { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; }
 .legend .sw { width: 26px; height: 10px; display: block; }
@@ -445,6 +453,8 @@ h1 {
 }
 
 .panel .where { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+/* the office, above the place name */
+.panel p.kicker { margin: 0 0 2px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2; }
 
 .panel h3 {
   margin: 22px 0 8px;
@@ -505,8 +515,6 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 
 .summary { margin: 14px 0 0; font-size: 15px; }
 .note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
-.vote-toggle { margin-top: 14px; display: flex; }
-.vote-toggle button { flex: 1; }
 .ev-bar { position: relative; overflow: visible; }
 .ev-bar span { border-radius: 4px; }
 .ev-bar .need { position: absolute; left: calc(var(--need, 0.5019) * 100%); top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
@@ -540,7 +548,54 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .race-list button:hover .who { text-decoration: underline; }
 .race-list .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .race-list .what { color: var(--muted); }
+.race-list .prev-row { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 8px; padding: 6px 0; }
 .seat-bar .need { left: calc(var(--need) * 100%); }
+
+/* One bar per office: Democrats from the left, Republicans from the right */
+.tug { margin: 12px 0 4px; }
+.tug-head, .tug-foot { display: flex; justify-content: space-between; gap: 8px; }
+.tug-head { font-size: 15px; align-items: center; }
+.tug-head > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* count over name, so both counts sit the same distance from the edges */
+.tug-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.tug-head .gop .tug-who { align-items: flex-end; text-align: right; }
+.tug-num { display: flex; align-items: baseline; gap: 6px; }
+.tug-head .pname { font-size: 13px; color: var(--muted); }
+.tug-head .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tug-head .avatar { width: 36px; height: 36px; margin: 0; }
+.tug-head b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.tug-head .dem b { color: var(--dem); }
+.tug-head .gop b { color: var(--gop); }
+.tug-bar { height: 14px; margin-top: 6px; }
+.tug-bar > span { border-radius: 0; }
+.tug-bar > span:first-child { border-radius: 4px 0 0 4px; }
+.tug-bar > span:last-of-type:not(:first-child) { border-radius: 0 4px 4px 0; }
+.tug-bar .gap { flex: 1; }
+.tug-bar .need { top: -4px; bottom: -4px; }
+.tug-need { font-size: 12px; color: var(--muted); text-align: center; margin: 4px 0 0; }
+.tug-foot { margin-top: 6px; }
+.tug-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.tug-lines { min-width: 0; }
+.tug-lines.gop { text-align: right; }
+.tug-lines .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.tug-lines.gop .sw { margin: 0 0 0 6px; }
+.tug-gains { margin-top: 4px; }
+/* one line per side: ▲ 10 gained   ▼ 0 lost */
+.tug-gains-side { display: flex; gap: 14px; white-space: nowrap; }
+.tug-gains-side, .state-gains { font-variant-numeric: tabular-nums; }
+.gain { color: var(--gain); font-weight: 600; }
+.loss { color: var(--loss); font-weight: 600; }
+.tug-gains + .tug-bar { margin-top: 6px; }
+.tug-lines .up, .tug-lines .up ~ .down { color: var(--ink); }
+.state-gains { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; display: grid; grid-template-columns: auto auto auto; justify-content: start; column-gap: 18px; row-gap: 2px; }
+.state-gains li { display: contents; }
+.tug-other { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+/* popular vote section: shares above a thinner bar, counts under the shares */
+.tug.pop { margin-top: 4px; }
+.tug.pop .tug-bar { height: 10px; }
+.tug.pop .pop-pc { font-size: 20px; font-variant-numeric: tabular-nums; }
+.tug.pop .tug-foot { margin: 0 0 6px; }
+.tug.pop .note { margin-top: 6px; }
 #map .district { stroke: var(--county-line); stroke-width: 0.35; vector-effect: non-scaling-stroke; cursor: pointer; }
 #map .district.dim { opacity: 0.28; }
 #map .district.pickable:hover { stroke: var(--ink); stroke-width: 1.2; }
