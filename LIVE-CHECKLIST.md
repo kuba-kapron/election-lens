@@ -16,6 +16,8 @@ Times are Warsaw time (CET).
 4. Check that the page says "updated" with the current time and has no "Test data" label.
 5. Keep the Mac plugged in, and stop it from sleeping (System Settings > Lock Screen, or run
    `caffeinate -d` in a third window).
+6. Public copy (optional), a third window: `pipeline/publish.sh --loop` uploads web/ to
+   Cloudflare Pages every 150 s. Page changes reach the public site only while it runs.
 
 ## When polls close
 
@@ -36,18 +38,20 @@ Florida, Oregon, South Dakota, Rhode Island, Texas, New York, Maryland and Arizo
 once their files fill in), civicAPI for the rest.
 
 Times from CBS News (the moment a state's last polls close). Official state results are read
-for North Carolina, South Carolina, Georgia, Florida, Texas, Virginia, Iowa, Delaware, South
-Dakota, Oregon and Rhode Island; every other race comes from civicAPI (unofficial, labeled on
-the page). Virginia and Rhode Island show civicAPI until their official report has numbers,
-then switch by themselves; Florida the same once its file fills in.
+for North Carolina, South Carolina, Georgia, Texas, Virginia, Iowa, Delaware, South Dakota,
+Oregon and Rhode Island; every other race comes from civicAPI (unofficial, labeled on the
+page). Virginia and Rhode Island show civicAPI until their official report has numbers, then
+switch by themselves. Florida's election-night site (floridaelectionwatch.gov) is behind a bot
+check, so Florida comes from civicAPI. A source that had numbers and then fails keeps its last
+numbers (marked stale after 10 minutes).
 
 Official sources usually post the first numbers 15–45 minutes after polls close.
 
 House: official state results for 182 districts (NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT,
 WA, IN, ND; Florida and Virginia once their files fill in, North Dakota once its page switches
-from 2024 to 2026: until then the importer prints "ND page shows the election of 11/5/2024"); the other districts from civicAPI in one request
-per round (unofficial), on the 2026
-district maps, and show who is leading, never who won. The importer prints one House line
+from 2024 to 2026: until then the importer prints "ND page shows the election of 11/5/2024"); the other districts from civicAPI
+(unofficial), asked one state at a time, three states per round, on the 2026 district maps.
+Districts show who is leading until you call them (below). The importer prints one House line
 per round ("435 races, N with votes"). Louisiana's House vote tonight is a primary.
 
 ## What to watch
@@ -57,6 +61,8 @@ per round ("435 races, N with votes"). Louisiana's House vote tonight is a prima
   - "results file is still empty": Florida, before its polls close.
   - "HTTP 403 (refusal 1 of 3)": a site refused us. After 3 refusals the importer leaves that
     site alone and the race moves to the next source.
+- **"slow; keeping the last copy"**: a site timed out or answered 5xx. Not a refusal: the
+  importer keeps its last numbers and tries again in 3 minutes.
 - **"Not refreshed for a while"** in a race's panel: no fresh numbers for 10 minutes. Check
   the importer window.
 - **civicAPI numbers** are unofficial. When a county or state posts numbers you can see
@@ -78,9 +84,15 @@ Race ids: the two-letter state plus "-sen" (e.g. MI-sen, NH-sen), and OH-gov, TX
 The page never calls a race itself. When a news organization calls one:
 
 ```
-uv run pipeline/live_manual.py call GA-sen Ossoff --by AP
-uv run pipeline/live_manual.py uncall GA-sen          # if it was a mistake
+uv run pipeline/live_manual.py call XX-sen Lastname --by AP
+uv run pipeline/live_manual.py call XX-3 Lastname --by AP     # House district (XX-AL at large)
+uv run pipeline/live_manual.py uncall XX-sen                  # if it was a mistake
 ```
+
+XX is the state code and Lastname the candidate's last name as the page shows it. Never copy a
+real example: a copied command once called Wyoming by mistake. The importer reads calls at the
+start of each round, so a call (or uncall) shows within a minute. House districts can be called
+but their numbers can't be typed in.
 
 ## Maine
 
@@ -90,5 +102,6 @@ takes about a week, so the race can't be called tonight unless someone wins outr
 ## If something breaks
 
 - Page blank or stuck: reload with Cmd+Option+R (Safari caches hard).
-- Importer crashed: start it again. Nothing is lost; it re-reads everything.
+- Importer crashed, or you changed its code: start it again (Ctrl+C, then the same command).
+  Nothing is lost; it re-reads everything and rebuilds the charts from the snapshots.
 - A state's site keeps refusing: leave it. Use civicAPI or manual entry, never a workaround.

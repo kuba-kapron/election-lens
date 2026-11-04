@@ -11,12 +11,20 @@ US presidential results 2000–2024 on one static page (`web/`):
 
 - Map colored by state (default) or county; click a state to zoom in and see its counties,
   click a county to zoom to it. Typeahead state finder (combobox).
-- Two views: **Margin** (who won, by how much) and **Shift** (change in margin since the
-  previous election), with optional **Arrows** in Shift (left = toward Democrats,
-  right = toward Republicans, length = size of shift, constant screen size when zoomed).
-- National panel toggle: **Electoral College** (default) or **Popular vote**. In Electoral
-  College + States + Margin, states are solid for a hold and striped for a flip; Maine and
-  Nebraska show a badge with the second candidate's district electoral votes in split years.
+- Map control **Winner | Margin | Shift** (president; Senate, House and governors have
+  Winner | Margin): Winner = states (or seats) solid for a hold, striped for a flip, and
+  tonight called races solid, leads in one light shade; Margin = shaded by margin; Shift =
+  change in margin since the previous election, with optional **Arrows** (left = toward
+  Democrats, right = toward Republicans, length = size of shift, constant screen size when
+  zoomed). Winner colors states only (the county map shows the margin). Maine and Nebraska
+  show a badge with the second candidate's district electoral votes in split years.
+  The year ribbon follows the map: electoral votes or seats under Winner, the popular-vote
+  margin under Margin and Shift. (Decided 4 November 2026; replaced the panel's Electoral
+  College | Popular vote and Seats | Popular vote tabs.)
+- Country panels: electoral votes (president) or one totals bar per office (Senate, House,
+  governors; also a state's House delegation): logos and big counts of certain seats, ▲ gained
+  ▼ lost (green/red), Democrats from the left, Republicans from the right, light = leading,
+  a mark at control (or half); then a "Popular vote" section with the same layout.
 - Side panel: results with candidate portraits (or initials), full names, winner checkmark
   and bold, margin history chart. Tooltips with share bars (Margin) or a compact shift line.
 - Light/dark toggle (follows the system until clicked, then remembered in localStorage).
@@ -30,8 +38,11 @@ US presidential results 2000–2024 on one static page (`web/`):
   of its dot, else left, below or above, never over another name, and avoids covering other
   cities' dots; same screen size at every zoom and screen width. Alaska and Hawaii cities show
   only for the country or their own state (their insets sit near other states).
-- Shareable links: `#year=2024&view=shift&map=counties&vote=popular&arrows=on&place=48201`.
-  Defaults are left out of the link; old `#2024/margin/48201` links still work.
+- Shareable links: `#year=2024&view=shift&map=counties&color=margin&arrows=on&place=48201`.
+  Defaults are left out of the link; old `#2024/margin/48201` and `vote=popular` (opens
+  Margin) links still work.
+- Panel headlines: the office in small capitals above the place ("U.S. SENATE" over
+  "Georgia", "GOVERNOR" over "Fulton County, GA"), year and update time in the grey line.
 
 ## Layout
 
@@ -51,6 +62,9 @@ pipeline/build_house_geo.sh  district shapes -> web/data/house/plans-<year>.json
                              changed states measured by pipeline/house_plans.py)
 pipeline/build_senate.py     -> web/data/senate.json (statewide, counties, seat history)
 pipeline/build_house.py      -> web/data/house.json (435 districts per year)
+pipeline/fetch_governor.sh   MEDSL precinct returns 2018, 2022, 2024 -> data/raw/governor/
+pipeline/build_governor.py   -> web/data/governor.json (statewide governor results per year)
+pipeline/publish.sh          upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
 pipeline/congress.py, xlsx.py  shared readers: FEC spreadsheets, Clerk PDF text (pypdf)
 web/index.html, app.js, style.css   the page; plain JS + D3 v7, no build step
 web/vendor/                  D3, topojson-client, Public Sans (vendored, licenses in README there)
@@ -82,7 +96,12 @@ Safari caches aggressively: reload with Cmd+Option+R after changes.
   George W. Bush keeps the W.); everywhere else uses last names.
 - Default toggle option sits on the left (States | Counties, Electoral College | Popular vote).
 - Segmented controls share one style; the theme toggle is one button with a sliding thumb.
-- Plain, short UI labels; longer explanations go in `title` hover text or the legend.
+- Plain, short UI labels; longer explanations go in `title` hover text or the legend. No
+  summary sentences under totals or results: facts go in grey lines ("Called by AP ·
+  259,504 votes counted (92%)"); caveats as small notes or an asterisk under the legend.
+- Seats changing party: "Pickup" tonight, "Flipped" for past years. Checkmarks only on
+  tonight's called races (past winners are obvious). One shared component per kind of
+  display (the totals bar, the race grey line), so views stay alike across years and levels.
 - Check changes in a browser at desktop and phone widths, in light and dark mode.
 
 ## Senate and House results 2020–2024
@@ -97,7 +116,7 @@ Decided with the owner:
   the FEC's official "Federal Elections 2020/2022" compilations. MEDSL's simplified party
   labels have errors (Lummis WY 2020, Duckworth IL 2022, Van Hollen MD 2022 come out as
   "other"); work from the detailed party and verify.
-- Margin only for Senate and House. No Shift view yet: the same Senate seat is up every
+- No Shift view for Senate and House yet: the same Senate seat is up every
   6 years and House districts were redrawn for 2022 (and some for 2024). Revisit later by
   looking at what TV networks do.
 - Runoffs and ranked-choice: the deciding round (Georgia runoffs, final RCV round) colors
@@ -208,15 +227,31 @@ Rules agreed with the owner:
   line of the leader's lead over the runner-up, scaled to the count from 5% of the latest total
   (earlier lopsided counts are clipped), dashed line at a change of source, hover box with the
   numbers. --replay charts its test data, marked; a real run rebuilds the files from snapshots.
-- Local first; going public later only needs an upload of web/data/live/ (ordinary hosting with
-  SFTP/rsync and no caching of those files, or the page's ?t= query).
+- Public copy: Cloudflare Pages (project election-lens), `pipeline/publish.sh --loop` uploads
+  web/ every 150 s (about 200 of the free plan's 500 uploads a month per night); the importer
+  runs separately. Page changes reach it only through that upload.
+- Added on election night (4 November): a source that had votes and then fails keeps its last
+  reading (Virginia's report list is briefly empty while it publishes); timeouts and 5xx are
+  "slow" (cached copy kept, site paused 3 min), not refusals. civicAPI was overloaded: one race
+  took ~36 s and the all-states House list returned 502s, so House lists are asked one state at
+  a time (3 per round, polls-closed and longest-waiting first; official-source states skipped
+  except Florida). House districts can be called by hand (`call KY-3 Name --by AP`), and a
+  called race with no numbers still shows its winner. Clarity's share counted is summed from
+  county precincts (its summary counts fully reported counties). A source may drop half of a
+  double surname (NY's "Joel Azumah" for Anabilah-Azumah). Florida moved election night to
+  floridaelectionwatch.gov behind a Cloudflare bot check: not used (civicAPI instead).
+- Pickups: a called race won by the other party than last time (Senate seat history; House
+  same district where the map did not change; governors from web/data/governor.json, 2022, or
+  2024 for NH and VT). Seats with no earlier result are left out, noted under the legend.
 
-Next after election night: governor results 2020, 2022, 2024 (the owner wants them; decided
-2 November 2026 to build the live page first). Even years only for now (2021/2023 odd-year
-races later). Sources: MEDSL "State Precinct-Level Returns" per state (2022 and 2024 open,
-CC0; 2020 behind the Dataverse guestbook, so the owner downloads it), each race checked against
-its state's certified statewide result (no FEC-style national source for governors). The
-per-state files total about 2 GB: ask before downloading.
+Governor history (started 4 November 2026 for tonight's pickups): MEDSL official precinct
+returns on GitHub, 2018 (all states' state offices, one zip), 2022 and 2024 (per state, only the
+states with a governor race), summed to the state by build_governor.py. Fusion lines summed per
+candidate; New Mexico 2022 has no party labels (taken from the same people's other MEDSL
+races). Gaps: Tennessee 2022 has no governor rows; 2020 is behind the Dataverse guestbook (the
+owner downloads it). Still to do: check every race against its state's certified result (no
+FEC-style national source; New York 2018 is about 350,000 short for Cuomo), then governor
+pages for past years. Even years only for now (2021/2023 odd-year races later).
 
 Also after election night: tidy pipeline/ into topic folders (common/ with the polite fetcher,
 xlsx and state codes; president/, congress/, photos/, live/), run as `uv run -m pipeline.<topic>.<script>`;
