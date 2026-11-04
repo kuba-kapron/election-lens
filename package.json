@@ -1,0 +1,9 @@
+{
+  "name": "election-lens",
+  "private": true,
+  "description": "Tools for publishing the site (Cloudflare Pages upload).",
+  "license": "AGPL-3.0",
+  "devDependencies": {
+    "wrangler": "4.151.2"
+  }
+}
