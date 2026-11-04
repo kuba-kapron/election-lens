@@ -66,7 +66,7 @@ def read_clarity(spec):
             continue
         names = [re.sub(r"^[A-Z]{3}\s+", "", n) for n in c["CH"]]
         out[d] = _reading(names, list(c["V"]), 100 * c["PR"] / c["TP"] if c.get("TP") else None,
-                          "precincts reporting", _fetched(url))
+                          "counties fully reported", _fetched(url))  # Clarity counts counties, not precincts
     return out
 
 

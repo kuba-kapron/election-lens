@@ -116,7 +116,10 @@ def read_clarity(race, src):
         raise ValueError(f"Clarity {base}: no contest {src['contest']!r}")
     names = [re.sub(r"^[A-Z]{3}\s+", "", n) for n in c["CH"]]
     reading = Reading(names, c["P"], list(c["V"]), sum(c["V"]),
-                      pct=100 * c["PR"] / c["TP"] if c.get("TP") else None, pct_of="precincts reporting",
+                      pct=100 * c["PR"] / c["TP"] if c.get("TP") else None,
+                      # Clarity's statewide summary counts counties that have fully reported
+                      # (SC 46, IA 99), not precincts: early votes come in long before any is done
+                      pct_of="counties fully reported",
                       fetched=_fetched(f"{base}/{ver}/json/en/summary.json"))
     # county figures: detail XML, a new file for each published version
     detail_url = f"{base}/{ver}/reports/detailxml.zip"
@@ -124,8 +127,14 @@ def read_clarity(race, src):
     root = ET.fromstring(z.read("detail.xml"))
     contest = next((x for x in root.iter("Contest") if x.get("text") == src["contest"]), None)
     if contest is not None:
-        pct = {x.get("name"): float(x.get("precinctsReportingPercent") or 0)
-               for x in contest.iter("County") if x.get("precinctsParticipating")}
+        units = [x for x in contest.iter("County") if x.get("precinctsParticipating")]
+        pct = {x.get("name"): float(x.get("precinctsReportingPercent") or 0) for x in units}
+        # statewide share of precincts reporting, added up from the counties: more useful than
+        # the summary's counties fully reported, which stays at 0 for hours
+        part = sum(int(x.get("precinctsParticipating") or 0) for x in units)
+        if part:
+            reading.pct = 100 * sum(int(x.get("precinctsReported") or 0) for x in units) / part
+            reading.pct_of = "precincts reporting"
         for choice in contest.iter("Choice"):
             name = re.sub(r"^[A-Z]{3}\s+", "", choice.get("text", ""))
             for vt in choice.iter("VoteType"):

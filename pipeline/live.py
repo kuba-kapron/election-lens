@@ -79,7 +79,15 @@ def index_of(race, raw):
     """
     scores = [C.matches(raw, LR.last_name(name), name.split(" ", 1)[0]) for name, _ in race["cands"]]
     best = max(scores, default=0)
-    return scores.index(best) if best and scores.count(best) == 1 else None
+    if best:
+        return scores.index(best) if scores.count(best) == 1 else None
+    # a source that drops one part of a double surname ("Joel Azumah" for Joel Anabilah-Azumah,
+    # New York 2026): one part of the surname and the first name, for exactly one candidate
+    toks = C.name_tokens(raw)
+    part = [i for i, (name, _) in enumerate(race["cands"])
+            if "-" in LR.last_name(name) and C.name_tokens(name.split(" ", 1)[0])[:1] and C.name_tokens(name.split(" ", 1)[0])[0] in toks
+            and any(p in toks for p in C.name_tokens(LR.last_name(name).replace("-", " ")))]
+    return part[0] if len(part) == 1 else None
 
 
 def align(race, names, votes_by_name, total):
@@ -106,24 +114,34 @@ def previous(race, senate):
                       for i, c in enumerate(r["cands"])]}
 
 
+# Last reading with votes from each race's sources. A source that had votes and then fails
+# for a while (Virginia's report list is briefly empty while it publishes a new batch) keeps
+# its last numbers instead of the race falling back to a source with fewer or none; the page
+# shows when they were fetched and marks them stale after STALE_AFTER.
+LAST_GOOD = {}
+
+
 def read_race(race, args, started):
     """(reading, source, errors) for the first source with votes."""
     errors, first_ok = [], None
     if args.replay:
         return S.read_replay(race, {}, started, args.replay), {"kind": "replay"}, errors
-    for src in race["sources"]:
+    for n, src in enumerate(race["sources"]):
         try:
             r = S.READERS[src["kind"]](race, src)
-        except (F.Refused, ValueError, KeyError) as e:
-            errors.append(f"{src['kind']}: {e}")
-            continue
-        except Exception as e:  # a reader bug must not stop the other races
-            errors.append(f"{src['kind']}: {type(e).__name__}: {e}")
+        except Exception as e:  # refused, not published yet, or a reader bug: never stop the night
+            msg = str(e) if isinstance(e, (F.Refused, ValueError, KeyError)) else f"{type(e).__name__}: {e}"
+            last = LAST_GOOD.get((race["id"], n))
+            if last:
+                errors.append(f"{src['kind']}: {msg} (keeping its last numbers)")
+                return last, src, errors
+            errors.append(f"{src['kind']}: {msg}")
             continue
         if r.test and not args.allow_test:
             errors.append(f"{src['kind']}: test data, not shown")
             continue
         if r.total > 0:
+            LAST_GOOD[(race["id"], n)] = r
             return r, src, errors
         first_ok = first_ok or (r, src)
     return (*first_ok, errors) if first_ok else (None, None, errors)
@@ -147,6 +165,11 @@ def build(race, reading, src, errors, manual, calls, senate):
         name, url, official, kind = f"Entered by hand from {m['source']}", None, False, "manual"
     if reading is None:
         out.update({"rounds": [], "counties": {}, "pct": None, "source": None, "status": "no data"})
+        call = calls.get(race["id"])
+        w = next((i for i, c in enumerate(out["cands"]) if call and c["last"] == call["winner"]), None)
+        if w is not None:  # called without numbers (e.g. Pennsylvania): still show the winner
+            out["cands"].insert(0, out["cands"].pop(w))
+            out["call"] = {"winner": 0, "by": call["by"], "at": call["at"]}
         return out
     v, other = align(race, reading.names, dict(zip(reading.names, reading.votes)), reading.total)
     counties = {}
@@ -235,17 +258,94 @@ def not_up(senate):
 PARTY = {"Democratic": "D", "Republican": "R", "Libertarian": "L", "Green": "G", "Independent": "I"}
 
 
-def house(args, started, history, plans):
+def house_calls(races, calls):
+    """Race calls entered by hand for House districts (pipeline/live_manual.py, ids like "KY-03"):
+    the winner moves to the top, as in the Senate and governor races."""
+    for key, call in calls.items():
+        st, _, num = key.partition("-")
+        if st not in S.ABBR_TO_FIPS or not num.isdigit():
+            continue  # a Senate or governor race
+        race = races.get(f"{S.ABBR_TO_FIPS[st]}-{num}")
+        if not race:
+            print(f"{time.strftime('%H:%M:%S')} House   call {key}: no such district in tonight's races", flush=True)
+            continue
+        i = next((i for i, c in enumerate(race["cands"]) if c["last"].lower() == call["winner"].lower()), None)
+        if i is None:
+            print(f"{time.strftime('%H:%M:%S')} House   call {key}: no candidate {call['winner']!r}", flush=True)
+            continue
+        order = [i] + [j for j in range(len(race["cands"])) if j != i]
+        race["cands"] = [race["cands"][j] for j in order]
+        rd = race["rounds"][0]
+        rd["votes"] = [rd["votes"][j] for j in order]
+        race["call"] = {"winner": 0, "by": call["by"], "at": call["at"]}
+
+
+HOUSE_PER_ROUND = 3  # states asked per round (about 30 s each tonight), longest-waiting first
+HOUSE_STATE_EVERY = 300  # seconds before a state's list is asked for again
+
+
+HOUSE_STATES = [st for st in S.ABBR_TO_FIPS if st != "DC" and (st not in LH.HOUSE or st == "FL")]
+
+
+def ask_house_states(by_state=None):
+    """Ask civicAPI for HOUSE_PER_ROUND states' House lists. Called at the start of each round,
+    so the House gets the first civicAPI request after a pause (asked last, it never got one:
+    slow Senate and governor requests kept civicAPI paused by the time its turn came)."""
+    if not by_state:  # district counts per state, from the all-states list
+        by_state = {}
+        try:
+            for r in json.loads(F.cached(LR.HOUSE_SEARCH)[0] or b"{}").get("races", []):
+                if (r.get("election_date") or "").startswith("2026-11-03"):
+                    by_state.setdefault(r.get("province"), []).append(r)
+        except ValueError:
+            pass
+    age = lambda st: time.time() - (F.cached(LR.HOUSE_STATE_SEARCH.format(st=st))[1] or 0)
+    seats = lambda st: len(by_state.get(st, []))
+    closed = lambda st: LR.close_times(st)[0] <= datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    # polls closed first, then the longest wait, then the most districts
+    order = sorted(HOUSE_STATES, key=lambda st: (not closed(st), -min(age(st), 86400), -seats(st)))
+    asked = 0
+    for st in order:
+        if asked >= HOUSE_PER_ROUND or age(st) < HOUSE_STATE_EVERY:
+            continue
+        asked += 1
+        try:
+            F.fetch(LR.HOUSE_STATE_SEARCH.format(st=st), min_interval=HOUSE_STATE_EVERY)
+        except (F.Refused, OSError) as e:
+            print(f"{time.strftime('%H:%M:%S')} House   civicAPI {st}: {e}", flush=True)
+
+
+def house_lists(args, ask=False):
+    """civicAPI's House races, as (race, fetched time): each state's own list where we have one
+    (asked HOUSE_PER_ROUND states per round, those waiting longest first), else the all-states list.
+    States whose official results cover their districts (pipeline/live_house.py) are not asked
+    one by one, except Florida, whose election-night site blocks scripts."""
+    by_state = {}
+    try:
+        b, t = F.cached(LR.HOUSE_SEARCH)
+        if b:
+            for r in json.loads(b).get("races", []):
+                by_state.setdefault(r.get("province"), []).append((r, t))
+    except ValueError:
+        pass
+    if ask:
+        ask_house_states(by_state)
+    for st in HOUSE_STATES:
+        b, t = F.cached(LR.HOUSE_STATE_SEARCH.format(st=st))
+        if b:
+            try:
+                by_state[st] = [(r, t) for r in json.loads(b).get("races", [])]
+            except ValueError:
+                pass
+    return [x for xs in by_state.values() for x in xs]
+
+
+def house(args, started, history, plans, calls=None):
     """All 435 House races from one civicAPI request: {"SS-DD": race}, shaped like house.json's
     races so the page can reuse its House views, plus live fields (pct, source, status).
     The previous result is the same district in 2024, only where the state kept its map."""
-    try:
-        d = json.loads(F.fetch(LR.HOUSE_SEARCH))
-    except (F.Refused, ValueError) as e:
-        print(f"{time.strftime('%H:%M:%S')} House   none: {e}", flush=True)
-        return {}
     out = {}
-    for r in d.get("races", []):
+    for r, fetched in house_lists(args):
         if r.get("type") != "House of Representatives" or not (r.get("election_date") or "").startswith("2026-11-03"):
             continue
         st, dist = r.get("province"), str(r.get("district") or "")
@@ -281,7 +381,7 @@ def house(args, started, history, plans):
                 "pct": r.get("percent_reporting"), "pct_of": "expected vote (civicAPI estimate)",
                 "polls_close": first, "all_closed": last_close, "status": "counting" if total else "no votes yet",
                 "source": {"name": "civicAPI", "url": "https://civicapi.org/", "official": False, "kind": "civicapi",
-                           "fetched": iso(F.cached(LR.HOUSE_SEARCH)[1]), "as_of": None},
+                           "fetched": iso(fetched), "as_of": None},
                 "test": test and args.allow_test, "notes": [LR.HOUSE_NOTES[st]] if st in LR.HOUSE_NOTES else []}
         fips = S.ABBR_TO_FIPS[st]
         if plans.get("2026", {}).get(fips) != 2026:  # same map as 2024: same district, comparable
@@ -293,6 +393,7 @@ def house(args, started, history, plans):
                                           for i, c in enumerate(prev["cands"])]}
         out[did] = race
     official = official_house(out) if not args.replay else 0
+    house_calls(out, calls or {})
     counted = sum(1 for x in out.values() if x["rounds"][0]["total"])
     print(f"{time.strftime('%H:%M:%S')} House   {len(out)} races, {counted} with votes; "
           f"{official} from official state results, the rest civicAPI", flush=True)
@@ -307,12 +408,14 @@ def official_house(races):
     for st, spec in LH.HOUSE.items():
         try:
             readings = spec["read"](spec)
-        except (F.Refused, ValueError, KeyError, OSError) as e:
-            print(f"{time.strftime('%H:%M:%S')} House   {st}: {e}", flush=True)
-            continue
-        except Exception as e:  # a reader bug must not stop the night
-            print(f"{time.strftime('%H:%M:%S')} House   {st}: {type(e).__name__}: {e}", flush=True)
-            continue
+            if any(rd.total for rd in readings.values()):
+                LAST_GOOD[("house", st)] = readings
+        except Exception as e:  # refused, not published yet, or a reader bug: never stop the night
+            msg = str(e) if isinstance(e, (F.Refused, ValueError, KeyError, OSError)) else f"{type(e).__name__}: {e}"
+            readings = LAST_GOOD.get(("house", st))
+            print(f"{time.strftime('%H:%M:%S')} House   {st}: {msg}" + ("; keeping its last numbers" if readings else ""), flush=True)
+            if not readings:
+                continue
         for d, rd in readings.items():
             race = races.get(f"{S.ABBR_TO_FIPS[st]}-{d}")
             if not race or (rd.total == 0 and race["rounds"][0]["total"] > 0):
@@ -426,6 +529,8 @@ def main():
         tr.write(OUT)
     while True:
         manual, calls = load(MANUAL), load(CALLS)
+        if not args.replay:
+            ask_house_states()  # first, before the Senate and governor races take civicAPI's turn
         races = []
         for race in LR.RACES:
             reading, src, errors = read_race(race, args, started)
@@ -435,7 +540,7 @@ def main():
             pct = f"{r['pct']:.0f}%" if r.get("pct") is not None else "?"
             print(f"{time.strftime('%H:%M:%S')} {race['id']:7} {(r.get('source') or {}).get('kind') or 'none':9} {pct:>4}  {lead}"
                   + (f"   [{'; '.join(errors)}]" if errors else ""), flush=True)
-        write(races, {} if args.replay else house(args, started, history, plans), held, keep=not args.replay, trails=trails)
+        write(races, {} if args.replay else house(args, started, history, plans, calls), held, keep=not args.replay, trails=trails)
         if args.once:
             return 0
         time.sleep(args.every)

@@ -301,6 +301,10 @@ def close_times(st):
 # on one ballot; its House general election is on 12 December (moved after the 2026 map;
 # Wikipedia, "2025–2026 United States redistricting").
 HOUSE_SEARCH = "https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives&election_date=2026-11-03&limit=1000"
+# One state at a time: on election night the all-states list (700 KB) failed with 502s while
+# a single state's (15 KB, about 30 s) came through; pipeline/live.py asks a few per round.
+HOUSE_STATE_SEARCH = ("https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives"
+                      "&province={st}&election_date=2026-11-03&limit=60")
 HOUSE_NOTES = {"LA": "Louisiana's House vote on 3 November is a primary with every candidate on one ballot; "
                      "the House general election is on 12 December."}
 

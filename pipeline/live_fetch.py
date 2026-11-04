@@ -32,7 +32,8 @@ USER_AGENT = "ElectionLens/0.1 (election results map, hobby project)"
 MIN_INTERVAL = 180  # seconds between requests to the same address
 SPACING = 1.5  # seconds between requests to the same site
 BLOCK_AFTER = 3  # refusals in a row before a site is left alone
-TIMEOUT = 45
+TIMEOUT = 60  # seconds; civicAPI took 22 s for the House list on election night
+SLOW_PAUSE = 180  # seconds to leave a slow or failing site alone (not a refusal)
 
 _robots = {}
 _state = {}  # per host: {"fails": n, "wait_until": t, "last": t}
@@ -125,7 +126,7 @@ def fetch(url, min_interval=MIN_INTERVAL):
     body_path, meta_path = _paths(url)
     meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
     now = time.time()
-    if body_path.exists() and now - meta.get("fetched", 0) < min_interval:
+    if body_path.exists() and now - max(meta.get("fetched", 0), meta.get("tried", 0)) < min_interval:
         return _plain(body_path.read_bytes(), url)
     host = _host(url)
     hs = _state.setdefault(host, {"fails": 0, "wait_until": 0})
@@ -170,12 +171,26 @@ def fetch(url, min_interval=MIN_INTERVAL):
             meta_path.write_text(json.dumps(meta))
             hs["fails"] = 0
             return _plain(body_path.read_bytes(), url)
-        if e.code in (403, 429) or e.code >= 500:
+        if e.code in (403, 429):
             hs["fails"] += 1
             hs["wait_until"] = now + min_interval * 2 ** hs["fails"]
             raise Refused(f"{host}: HTTP {e.code} (refusal {hs['fails']} of {BLOCK_AFTER})") from e
+        if e.code >= 500:
+            return _slow(url, hs, now, meta, meta_path, body_path, f"HTTP {e.code}")
         raise
     except (urllib.error.URLError, TimeoutError) as e:
-        hs["fails"] += 1
-        hs["wait_until"] = now + min_interval * 2 ** hs["fails"]
-        raise Refused(f"{host}: {e} (failure {hs['fails']} of {BLOCK_AFTER})") from e
+        return _slow(url, hs, now, meta, meta_path, body_path, str(e))
+
+
+def _slow(url, hs, now, meta, meta_path, body_path, why):
+    """A slow or failing server (timeout, 5xx) is not a refusal: keep the stored copy (the page
+    marks it stale after a while), leave the site alone for SLOW_PAUSE seconds, and never give
+    up on it for the night because of it."""
+    hs["wait_until"] = max(hs.get("wait_until", 0), now + SLOW_PAUSE)
+    if meta_path.exists():
+        meta["tried"] = now
+        meta_path.write_text(json.dumps(meta))
+    print(f"{time.strftime('%H:%M:%S')} {_host(url)}: {why}; keeping the last copy, trying again in {SLOW_PAUSE // 60} min", flush=True)
+    if body_path.exists():
+        return _plain(body_path.read_bytes(), url)
+    raise Refused(f"{_host(url)}: {why}")

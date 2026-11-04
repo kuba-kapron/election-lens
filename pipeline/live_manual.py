@@ -5,6 +5,7 @@ on its next round (within a minute).
     uv run pipeline/live_manual.py clear MI-sen                  # back to the automatic sources
     uv run pipeline/live_manual.py call GA-sen Ossoff --by AP     # someone has called the race
     uv run pipeline/live_manual.py uncall GA-sen
+    uv run pipeline/live_manual.py call KY-3 McGarvey --by AP     # House district (KY-AL / WY-AL at large)
     uv run pipeline/live_manual.py show
 
 Names are last names as the page shows them; race ids are in pipeline/live_races.py
@@ -25,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
 RACES = {r["id"]: r for r in LR.RACES}
+HOUSE_FILE = ROOT / "web" / "data" / "live" / "house.json"  # tonight's House candidates, from the importer
 
 
 def load(path):
@@ -38,6 +40,22 @@ def save(path, data):
 
 def last_names(race):
     return {LR.last_name(n).lower(): LR.last_name(n) for n, _ in race["cands"]}
+
+
+def house_district(text):
+    """ "KY-3", "ky-03", "WY-AL" -> ("KY-03", that district's race from the importer's file), or None."""
+    st, _, num = text.upper().partition("-")
+    if len(st) != 2 or not (num.isdigit() or num == "AL"):
+        return None
+    num = "00" if num == "AL" else num.zfill(2)
+    import live_sources as S
+    if st not in S.ABBR_TO_FIPS:
+        return None
+    races = json.loads(HOUSE_FILE.read_text())["races"] if HOUSE_FILE.exists() else {}
+    race = races.get(f"{S.ABBR_TO_FIPS[st]}-{num}")
+    if not race:
+        sys.exit(f"No House race {st}-{num} in {HOUSE_FILE.name} (is the importer running?)")
+    return f"{st}-{num}", race
 
 
 def race_id(text):
@@ -71,8 +89,15 @@ def main():
     if a.cmd == "show":
         print(json.dumps({"manual": manual, "calls": calls}, indent=2, ensure_ascii=False))
         return 0
-    rid = race_id(a.race)
-    names = last_names(RACES[rid])
+    district = house_district(a.race)
+    if district and a.cmd in ("set", "clear"):
+        sys.exit("House districts can be called or uncalled; numbers for them are not entered by hand.")
+    if district:
+        rid, hrace = district
+        names = {c["last"].lower(): c["last"] for c in hrace["cands"]}
+    else:
+        rid = race_id(a.race)
+        names = last_names(RACES[rid])
     if a.cmd == "set":
         votes = {}
         for item in a.votes:
