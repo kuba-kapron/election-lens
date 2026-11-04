@@ -978,30 +978,40 @@
   }
   function drawCongressLegend() {
     const el = document.getElementById("legend");
-    if (isLive()) return drawLiveLegend(el);
-    const sen = state.office === "senate";
-    const shown = sen ? sYear() : Object.values(hRaces());
+    raceLegend(el, isLive());
+  }
+  // One legend for Senate, House and governor maps, past years and tonight. Differences: "Pickup"
+  // tonight vs "Flipped" for past years, and tonight's own keys (leading, no votes yet).
+  function raceLegend(el, live) {
+    const sen = senLike(), house = state.office === "house";
+    const shown = live ? (house ? Object.values(hRaces()) : liveRaces()) : (sen ? sYear() : Object.values(hRaces()));
+    const winnerOf = r => (live ? (r.call && r.call.winner != null ? r.cands[r.call.winner].caucus : counted(r) ? raceLean(r).caucus : null) : r.cands[0]?.caucus);
+    const heldOf = r => (live ? heldBy(r)?.caucus : r.held);
     const box = fill => `<svg class="sw" viewBox="0 0 26 10" aria-hidden="true"><rect width="26" height="10" fill="${fill}"/></svg>`;
-    const key = (fill, text) => `<span class="key">${box(fill)}${text}</span>`;
-    if (congressCategorical()) {
-      const items = [key(colors.demSolid, "Democratic"), key(colors.gopSolid, "Republican")];
-      if (shown.some(r => r.cands[0].caucus === "I")) items.push(key(colors.indSolid, "Independent"));
-      const flips = new Set(shown.filter(r => r.held && r.held !== r.cands[0].caucus).map(r => r.cands[0].caucus));
-      const star = flipNote(shown.filter(r => !r.held).length, shown.some(r => r.held), sen ? "seats" : "districts",
-        sen ? "" : `new map since ${state.year - 2}`);
-      if (flips.has("D")) items.push(key("url(#flip-dem)", `Flipped to Democrats${star ? "*" : ""}`));
-      if (flips.has("R")) items.push(key("url(#flip-gop)", `Flipped to Republicans${star ? "*" : ""}`));
-      if (sen) items.push(key(colors.nodata, "No race this year"));
-      el.innerHTML = items.join("") + (flips.size ? star : "");
+    const key = (fills, text, title = "") => `<span class="key"${title ? ` title="${title}"` : ""}>${fills.map(box).join("")}${text}</span>`;
+    const noRace = sen ? key([colors.nodata], state.level === "counties" ? "No race or no county figures" : "No race") : "";
+    const pending = live ? key([colors.pending], "No votes counted yet") : "";
+    const winnerView = live ? state.cmap === "winner" : congressCategorical();
+    if (winnerView) {
+      // the colors say the party; the keys say won, leading or changed party
+      const ind = shown.some(r => winnerOf(r) === "I");
+      const items = [key([colors.demSolid, colors.gopSolid].concat(ind ? [colors.indSolid] : []), "Won", live ? "Called by a news organization" : "")];
+      if (live) items.push(key([colors.dem[1], colors.gop[1]].concat(ind ? [colors.ind[1]] : []), "Leading", "Not called yet: ahead in the votes counted so far"));
+      const flipped = shown.some(r => live ? pickup(r) : r.held && r.held !== r.cands[0].caucus);
+      const star = flipNote(shown.filter(r => !heldOf(r)).length, shown.some(r => heldOf(r)),
+        house ? "districts" : state.office === "governor" ? "races" : "seats",
+        house ? (live ? "new maps since 2024" : `new map since ${state.year - 2}`) : "");
+      if (flipped) items.push(key(["url(#flip-dem)", "url(#flip-gop)"], `${live ? "Pickup" : "Flipped"}${star ? "*" : ""}`,
+        live ? "Called, and the seat changes party" : "The seat changed party"));
+      el.innerHTML = items.join("") + pending + noRace + (flipped ? star : "");
       return;
     }
     const b = BINS.margin;
     const swatch = arr => arr.map(c => `<span style="background:${c}"></span>`).join("");
     let html = `<span>Republican +50</span><span class="ramp">${swatch([...colors.gop].reverse()) + swatch(colors.dem)}</span><span>Democratic +50</span>`;
     if (shown.some(r => r.cands.slice(0, 2).some(c => c.caucus === "I"))) html += `<span class="key"><span class="ramp">${swatch(colors.ind)}</span>Independent</span>`;
-    html += `<span>Winner's lead over the runner-up; steps at ${b.map(x => x * 100).join(", ")} points</span>`;
-    if (sen) html += key(colors.nodata, "No race or no county figures");
-    el.innerHTML = html;
+    html += `<span>Lead over the runner-up; steps at ${b.map(x => x * 100).join(", ")} points</span>`;
+    el.innerHTML = html + pending + noRace;
   }
 
   const SENATE_POP_NOTE = "Adds up the November votes in this year's Senate races only: about a third of the states, and some races had no Democrat or no Republican. States with two races count twice.";
@@ -1276,22 +1286,6 @@
     const rd = roundOf(r), winner = r.call && r.call.winner != null ? 0 : -1;
     return `<span class="tip-rows">${tipRows(r.cands, rd.votes, rd.total, winner)}</span>${leanLabel(raceLean(r))}
       <span class="hint">${liveStatus(r)}${r.test ? " · TEST DATA" : ""}</span>`;
-  }
-  function drawLiveLegend(el) {
-    const b = BINS.margin;
-    const swatch = arr => arr.map(c => `<span style="background:${c}"></span>`).join("");
-    const box = fill => `<svg class="sw" viewBox="0 0 26 10" aria-hidden="true"><rect width="26" height="10" fill="${fill}"/></svg>`;
-    // races with no earlier result can't be pickups: say how many, under the legend
-    const rs = state.office === "house" ? Object.values(hRaces()) : liveRaces();
-    const star = flipNote(rs.filter(r => !heldBy(r)).length, rs.some(r => heldBy(r)), state.office === "house" ? "districts" : "races",
-      state.office === "house" ? "new maps since 2024" : "");
-    const rest = `<span class="key">${box(colors.pending)}No votes counted yet</span><span class="key">${box(colors.nodata)}No race followed</span>`;
-    el.innerHTML = state.cmap === "margin"
-      ? `<span>Republican +50</span><span class="ramp">${swatch([...colors.gop].reverse()) + swatch(colors.dem)}</span><span>Democratic +50</span>
-      <span>Leader's margin in the votes counted so far, called or not; steps at ${b.map(x => x * 100).join(", ")} points.</span>${rest}`
-      : `<span class="key">${box(colors.demSolid)}${box(colors.gopSolid)}Won (called)</span>
-      <span class="key">${box(colors.dem[1])}${box(colors.gop[1])}Leading</span>
-      <span class="key">${box("url(#flip-dem)")}${box("url(#flip-gop)")}<span title="Called, and the seat changes party">Pickup${star ? "*" : ""}</span></span>${rest}${star}`;
   }
   function liveYearLabel() {
     const night = extra.live?.night, called = night?.senate_calls || { D: 0, R: 0, I: 0 };
