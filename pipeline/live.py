@@ -100,7 +100,27 @@ def align(race, names, votes_by_name, total):
     return v, max(0, total - sum(v))
 
 
+GOV_HISTORY = None
+
+
+def previous_governor(race):
+    """The state's last governor race (web/data/governor.json, from pipeline/build_governor.py):
+    2024 for New Hampshire and Vermont (two-year terms), 2022 elsewhere; None where the source
+    lacks it (Tennessee 2022)."""
+    global GOV_HISTORY
+    if GOV_HISTORY is None:
+        f = ROOT / "web/data/governor.json"
+        GOV_HISTORY = json.loads(f.read_text())["years"] if f.exists() else {}
+    year = 2024 if race["st"] in ("NH", "VT") else 2022
+    r = GOV_HISTORY.get(str(year), {}).get(S.ABBR_TO_FIPS[race["st"]])
+    if not r:
+        return None
+    return {"year": year, "seat": "governor", "total": r["total"], "cands": r["cands"]}
+
+
 def previous(race, senate):
+    if race["office"] == "governor":
+        return previous_governor(race)
     if not race.get("prev"):
         return None
     year, seat = race["prev"]
