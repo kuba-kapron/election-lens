@@ -41,6 +41,7 @@ class Reading:
     fetched: float | None = None
     as_of: str | None = None
     test: bool = False
+    county_source: dict | None = None  # when the county figures come from another source than the totals
 
 
 def _county_key(name):

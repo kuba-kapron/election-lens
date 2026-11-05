@@ -167,6 +167,31 @@ def read_race(race, args, started):
     return (*first_ok, errors) if first_ok else (None, None, errors)
 
 
+def county_fill(race, reading, src, errors, args):
+    """Official sources that give statewide totals only (Texas, Maryland, Oregon, South Dakota):
+    the county map is filled from the race's civicAPI fallback, labeled unofficial. The totals
+    stay official, so the counties need not add up to them exactly."""
+    if args.replay or reading is None or reading.counties or not src or src["kind"] == "civicapi":
+        return
+    c = next((x for x in race["sources"] if x["kind"] == "civicapi"), None)
+    if not c:
+        return
+    key = (race["id"], "counties")
+    try:
+        r = S.READERS["civicapi"](race, c)
+        if r.test or not r.counties:
+            r = None
+        else:
+            LAST_GOOD[key] = r
+    except Exception as e:  # never stop the night: keep the last county figures if there are any
+        r = LAST_GOOD.get(key)
+        errors.append(f"civicapi counties: {e}" + (" (keeping its last numbers)" if r else ""))
+    if r:
+        name, url, _ = LR.SOURCE_NAMES["civicapi"]
+        reading.counties = r.counties
+        reading.county_source = {"name": name, "url": url, "official": False, "fetched": iso(r.fetched)}
+
+
 def build(race, reading, src, errors, manual, calls, senate):
     now = time.time()
     out = {"id": race["id"], "st": S.ABBR_TO_FIPS[race["st"]], "office": race["office"], "seat": race["seat"],
@@ -199,6 +224,8 @@ def build(race, reading, src, errors, manual, calls, senate):
             counties[fips] = cv + [co, c["total"]]
     out["counties"] = counties
     out["county_pct"] = {f: round(c["pct"], 1) for f, c in reading.counties.items() if f and c.get("pct") is not None}
+    if reading.county_source:
+        out["county_source"] = reading.county_source
     out["rounds"] = [{"kind": "general", "label": "Votes counted so far", "votes": v, "other": other,
                       "total": reading.total}]
     out["county_round"] = 0
@@ -554,6 +581,7 @@ def main():
         races = []
         for race in LR.RACES:
             reading, src, errors = read_race(race, args, started)
+            county_fill(race, reading, src, errors, args)
             r = build(race, reading, src, errors, manual, calls, senate)
             races.append(r)
             lead = ", ".join(f"{c['last']} {r['rounds'][0]['votes'][i]:,}" for i, c in enumerate(r["cands"][:2])) if r.get("rounds") else "-"

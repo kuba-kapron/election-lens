@@ -1323,11 +1323,16 @@
     const tag = `<span class="live-stack"><span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>${time}</span>`;
     return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""}` : "live tonight"}</span>`;
   }
-  function liveSource(r) {
+  // "Source: Texas Secretary of State (official results), checked 22:48." The county panel names
+  // the county figures' source; the race panel adds it when it differs from the totals' source
+  function liveSource(r, county = false) {
     if (!r.source) return "";
-    const s = r.source, name = s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name;
-    const kind = s.official ? "official results" : "unofficial";
-    let t = `Source: ${name} (${kind})${s.fetched ? `, checked ${clock(s.fetched)}` : ""}.`;
+    const line = (label, s) => {
+      const name = s.url ? `<a href="${s.url}" target="_blank" rel="noopener">${s.name}</a>` : s.name;
+      return `${label}: ${name} (${s.official ? "official results" : "unofficial"})${s.fetched ? `, checked ${clock(s.fetched)}` : ""}.`;
+    };
+    const cs = r.county_source;
+    let t = county && cs ? line("Source", cs) : line("Source", r.source) + (cs ? ` ${line("County figures", cs)}` : "");
     if (r.stale) t += ` <strong>Not refreshed for a while; numbers may be behind.</strong>`;
     return `<p class="note">${t}</p>`;
   }
@@ -1367,12 +1372,12 @@
   }
   function liveCountyBody(r, fips) {
     const v = r.counties?.[fips], n = r.cands.length;
-    if (!v || !v[n + 1]) return `<p class="empty">No votes counted in this county yet.</p>${liveSource(r)}`;
+    if (!v || !v[n + 1]) return `<p class="empty">No votes counted in this county yet.</p>${liveSource(r, true)}`;
     const cp = r.county_pct?.[fips];
-    const precincts = r.pct_of && (r.pct_of.startsWith("precincts") || r.pct_of.startsWith("counties"));
+    const precincts = !r.county_source && r.pct_of && (r.pct_of.startsWith("precincts") || r.pct_of.startsWith("counties"));
     // same grey line as the race panel: votes counted (share)
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], -1)}</div>
-      <p class="note">${fmtInt(v[n + 1])} votes counted${cp != null ? ` (${Math.round(cp)}%${precincts ? " of precincts reporting" : ""})` : ""}</p>${liveSource(r)}`;
+      <p class="note">${fmtInt(v[n + 1])} votes counted${cp != null ? ` (${Math.round(cp)}%${precincts ? " of precincts reporting" : ""})` : ""}</p>${liveSource(r, true)}`;
   }
   // Senate balance tonight: seats not up (won in 2022/2024, current holder) + called + leading
   function senateBalance() {
@@ -1479,7 +1484,7 @@
     for (const r of liveRaces()) if (r.source && r.source.official) official.set(r.source.name, r.source.url);
     const list = [...official].sort((a, b) => a[0].localeCompare(b[0])).map(([n, u]) => (u ? `<a href="${u}">${n}</a>` : n));
     const joined = list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1] : list[0];
-    el.innerHTML = `2026 results, live: ${list.length ? `official results from ${joined}; ` : ""}unofficial counts from <a href="https://civicapi.org/">civicAPI</a> where states do not publish live data or block scripts; entries typed in by hand name their source. Poll closing times: <a href="https://www.cbsnews.com/news/when-polls-open-close-2026-midterm-elections/">CBS News</a>.`;
+    el.innerHTML = `2026 results, live: ${list.length ? `official results from ${joined}; ` : ""}unofficial counts from <a href="https://civicapi.org/">civicAPI</a> where states do not publish live data or block scripts, and its county figures where a state gives statewide totals only; entries typed in by hand name their source. Poll closing times: <a href="https://www.cbsnews.com/news/when-polls-open-close-2026-midterm-elections/">CBS News</a>.`;
   }
   function drawLivePanel() {
     drawLiveSources();
