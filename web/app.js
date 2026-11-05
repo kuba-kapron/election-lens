@@ -141,11 +141,6 @@
     const a = margin(record(sel, y)), b = margin(record(sel, p));
     return a == null || b == null ? null : a - b;
   }
-  // "by 13.7 points", or the vote count when the race is closer than 0.1 points
-  function by(v) {
-    const m = margin(v);
-    return Math.abs(m) < 0.001 ? `by ${fmtInt(Math.abs(v[0] - v[1]))} votes` : `by ${Math.abs(m * 100).toFixed(1)} points`;
-  }
   function mlabel(m) {
     if (m == null) return "";
     const pts = Math.abs(m * 100);
@@ -601,27 +596,23 @@
     } else if (!v) {
       html += `<p class="empty">No ${y} results for this place. ${noDataReason(s, state.year)}</p>`;
     } else {
-      const m = margin(v), sh = shift(s, y), p = prevYear(state.year);
+      const sh = shift(s, y), p = prevYear(state.year);
       const won = wonBy(s, y, v);
-      const popular = v[0] >= v[1] ? c.dem : c.gop;
-      let summary = s.type === "nation"
-        ? (c[won] === popular
-          ? `${popular} won the election and the popular vote, ${by(v)}.`
-          : `${c[won]} won the election in the Electoral College; ${popular} won the popular vote ${by(v)}.`)
-        : `${popular} won ${by(v)}.`;
-      if (sh != null) summary += ` The margin moved ${Math.abs(sh * 100).toFixed(1)} points toward ${sh >= 0 ? "Democrats" : "Republicans"} since ${p}.`;
+      // grey facts line, as on Senate and House panels: votes · shift · district split
+      const facts = [`${fmtInt(v[2])} votes`];
+      if (sh != null) facts.push(`Shift: ${Math.abs(sh * 100).toFixed(1)} points toward ${sh >= 0 ? "Democrats" : "Republicans"} since ${p}`);
       if (s.type === "state") {
         const [ed, er] = ec(y).states[st];
-        if (ed && er) summary += ` ${data.states[st].name} splits its electoral votes by district: ${c.gop} ${er}, ${c.dem} ${ed}.`;
+        if (ed && er) facts.push(`Electoral votes: ${c.gop} ${er}, ${c.dem} ${ed}`);
       }
       const other = v[2] - v[0] - v[1];
       html += `<div class="cand">
-        ${(s.type === "nation" ? winnerFirst(y) : byCount(v[0], v[1])).map(p => p === "dem"
+        ${byCount(v[0], v[1]).map(p => p === "dem"
           ? candRow(fullName(c.dem) + partyTag("D"), v[0], v[2], colors.demSolid, won === "dem", c.dem)
           : candRow(fullName(c.gop) + partyTag("R"), v[1], v[2], colors.gopSolid, won === "gop", c.gop)).join("")}
         ${other > 0 ? candRow("Others", other, v[2], "var(--muted)") : ""}
       </div>
-      <p class="summary">${summary} ${fmtInt(v[2])} votes cast.</p>`;
+      <p class="note">${facts.join(" · ")}</p>`;
       const note = data.notes?.[`${s.id}-${y}`];
       if (note) html += `<p class="note">${note}</p>`;
     }
@@ -828,7 +819,6 @@
     const pts = l.m * 100;
     return `<span class="mg ${cls}">${l.caucus}+${pts < 0.05 ? "0.0" : pts.toFixed(1)}</span>`;
   }
-  const byText = l => (l.m < 0.001 ? `by ${fmtInt(l.gap)} votes` : `by ${(l.m * 100).toFixed(1)} points`);
   // past years: a line in the tooltip when the seat changed party
   const flipLine = r => (r?.held && r.held !== r.cands[0].caucus ? `<span class="flip">${CAUCUS_NAME[r.cands[0].caucus]} gained the seat</span>` : "");
   // solid winner color; stripes when a seat changed party (Senate seat history; House: same district, same map)
@@ -1106,13 +1096,13 @@
     let note = `County figures: ${cr.label}.`;
     if (r.county_round !== r.rounds.length - 1) note += ` The seat was decided in the ${roundOf(r).kind === "runoff" ? "runoff" : "ranked-choice count"}, which has no county figures.`;
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], l.lead)}</div>
-      <p class="summary">${r.cands[l.lead].name} won the county ${byText(l)}. ${fmtInt(v[n + 1])} votes.</p>
-      <p class="note">${note}</p>${notesList(r.notes)}`;
+      <p class="note">${fmtInt(v[n + 1])} votes · ${note}</p>${notesList(r.notes)}`;
   }
-  // who controlled the Senate after an election: the majority, or in a 50–50 split the vice
-  // president's party (2020: Kamala Harris, from January 2021; see the control note)
-  const SENATE_TIE_BREAK = { 2020: "D" };
-  const senateControl = (c, y) => (c.D > c.R ? "D" : c.R > c.D ? "R" : SENATE_TIE_BREAK[y] ?? null);
+  // the vice president's party when the new Senate met (breaks 50–50 ties): Harris from
+  // January 2021 and 2023, Vance from January 2025
+  const SENATE_VP = { 2020: "D", 2022: "D", 2024: "R" };
+  const senateControl = (c, y) => (c.D > c.R ? "D" : c.R > c.D ? "R" : SENATE_VP[y] ?? null);
+  const senateNeed = vp => `51 for control${vp ? ` (50 for ${{ D: "Democrats", R: "Republicans" }[vp]})` : ""}`;
   function senateSeatsBody(y) {
     const c = extra.senate.control[y], rs = sYear(y);
     const won = { D: 0, R: 0, I: 0 };
@@ -1120,8 +1110,7 @@
     const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
     for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
       lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
-    return `${tugBar(t, 100, "51 for control", pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>
-      <ul class="notes"><li>Counts independents with the party they caucus with. A majority needs 51 seats, or 50 and the vice president's tie-breaking vote.</li>${c.note ? `<li>${c.note}</li>` : ""}</ul>`;
+    return `${tugBar(t, 100, senateNeed(SENATE_VP[y]), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>`;
   }
   function houseSeatsBody(y) {
     const c = extra.house.seats[y];
@@ -1346,9 +1335,11 @@
   function liveCountyBody(r, fips) {
     const v = r.counties?.[fips], n = r.cands.length;
     if (!v || !v[n + 1]) return `<p class="empty">No votes counted in this county yet.</p>${liveSource(r)}`;
-    const l = countyLean(r, fips), cp = r.county_pct?.[fips];
+    const cp = r.county_pct?.[fips];
+    const precincts = r.pct_of && (r.pct_of.startsWith("precincts") || r.pct_of.startsWith("counties"));
+    // same grey line as the race panel: votes counted (share)
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], -1)}</div>
-      <p class="summary">${r.cands[l.lead].name} leads the county ${byText(l)}.${cp != null ? ` ${Math.round(cp)}% ${r.pct_of && (r.pct_of.startsWith("precincts") || r.pct_of.startsWith("counties")) ? "of precincts reporting" : "counted"}.` : ""} ${fmtInt(v[n + 1])} votes counted.</p>${liveSource(r)}`;
+      <p class="note">${fmtInt(v[n + 1])} votes counted${cp != null ? ` (${Math.round(cp)}%${precincts ? " of precincts reporting" : ""})` : ""}</p>${liveSource(r)}`;
   }
   // Senate balance tonight: seats not up (won in 2022/2024, current holder) + called + leading
   function senateBalance() {
@@ -1421,8 +1412,8 @@
     for (const p of ["D", "R", "I"]) t[p] = { solid: b[p].notUp + b[p].called, lead: b[p].leading, solidText: "Not up or won",
       lines: [`${b[p].notUp} not up`, `${b[p].called} won`, `${b[p].leading} leading`] };
     const changed = (notUp.seats || []).filter(x => x.note);
-    return `${tugBar(t, 100, "51 for control (50 for Republicans)", liveRaces("senate"), "seats", "", t.D.solid >= 51 ? "D" : t.R.solid >= 50 ? "R" : null)}
-      <ul class="notes"><li>Seats not up: counted by who holds them now (current members of the Senate, congress-legislators), each matched to the race that filled it in 2022 or 2024.${changed.length ? " Changed since that race: " + changed.map(x => x.note).join(" ") : " All are held by the winner of that race."}</li></ul>
+    return `${tugBar(t, 100, senateNeed("R"), liveRaces("senate"), "seats", "", t.D.solid >= 51 ? "D" : t.R.solid >= 50 ? "R" : null)}
+      ${changed.length ? `<ul class="notes"><li>Seats not up held by someone other than that race's winner: ${changed.map(x => x.note).join(" ")}</li></ul>` : ""}
       ${popSection(senatePopular(null, liveRaces("senate")), true)}<p class="note">${SENATE_POP_NOTE.replace("this year's", "tonight's")}</p>
       <h3>Races</h3>`;
   }

@@ -514,7 +514,6 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .bar { height: 8px; background: var(--nodata); border-radius: 4px; overflow: hidden; display: flex; margin-top: 4px; grid-column: 1 / -1; }
 .bar span { display: block; height: 100%; }
 
-.summary { margin: 14px 0 0; font-size: 15px; }
 .note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 .ev-bar { position: relative; overflow: visible; }
 .ev-bar span { border-radius: 4px; }
