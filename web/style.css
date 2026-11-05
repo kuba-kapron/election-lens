@@ -436,11 +436,18 @@ h1 {
 .tip .hint { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
 
 /* Panel */
-.panel {
+/* Cards: the panel, the races list, and on narrow screens the panel's two parts (on wide
+   screens those two sit inside the panel's card, so they are not cards themselves) */
+.panel, .races, .panel-top, .panel-rest {
   background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 8px;
   padding: 20px;
+}
+@media not all and (max-width: 900px) {
+  .panel-top, .panel-rest { background: none; border: 0; border-radius: 0; padding: 0; }
+}
+.panel {
   position: sticky;
   top: 16px;
 }
@@ -457,7 +464,7 @@ h1 {
 /* the office, above the place name */
 .panel p.kicker { margin: 0 0 2px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2; }
 
-.panel h3 {
+.panel h3, .races h3 {
   margin: 22px 0 8px;
   font-size: 14px;
   font-weight: 700;
@@ -540,7 +547,16 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .notes { margin: 0; padding: 0; list-style: none; }
 .notes li { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 
-/* Lists of races in the panel (a state's districts, a state's Senate races) */
+/* Races: its own card under the map and the panel, the list in as many columns as fit */
+.races {
+  /* same width as the stage above (1320px less its 24px sides) */
+  margin: 0 max(24px, calc((100% - 1272px) / 2)) 24px;
+  padding: 4px 20px 16px;
+}
+.races .race-list { columns: 260px 4; column-gap: 32px; }
+.races .race-list li { break-inside: avoid; }
+
+/* Lists of races (a state's districts, a state's Senate races, tonight's races) */
 .race-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .race-list li { border-top: 1px solid var(--rule); }
 .race-list button { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 8px; width: 100%;
@@ -579,9 +595,13 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .tug-lines { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
 .tug-lines { min-width: 0; }
 .tug-lines.gop { text-align: right; }
-.tug-lines .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.tug-lines.gop .sw { margin: 0 0 0 6px; }
 .tug-gains { margin-top: 4px; }
+/* won / leading / not up: counts at the sides, the label once in the middle */
+.tug-rows { display: grid; grid-template-columns: 1fr auto 1fr; column-gap: 12px; margin-top: 6px; font-size: 13px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.tug-rows .what { color: var(--muted); text-align: center; }
+.tug-rows .gop { text-align: right; }
+.tug-rows .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.tug-rows .gop .sw { margin: 0 0 0 6px; }
 /* one line per side: ▲ 10 gained   ▼ 0 lost */
 .tug-gains-side { display: flex; gap: 14px; white-space: nowrap; }
 .tug-gains-side, .state-gains { font-variant-numeric: tabular-nums; }
@@ -616,11 +636,18 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 
 @media (max-width: 900px) {
   .stage { grid-template-columns: 1fr; }
-  .panel { position: static; }
+  /* the panel's two parts become cards of their own: the headline and totals above the map,
+     the rest below it */
+  .panel { display: contents; }
+  .panel-top { order: -1; }
+  .panel-rest:empty { display: none; }
+  /* a card's padding is its top space: no extra margin on its first heading */
+  .panel-top > :first-child, .panel-rest > :first-child { margin-top: 0; }
 }
 
 @media (max-width: 600px) {
   .masthead, .years, .stage, .colophon { padding-left: 16px; padding-right: 16px; }
+  .races { margin-left: 16px; margin-right: 16px; }
   .years .yr { font-size: 16px; }
   .years .who { display: none; }
   .years ol { grid-template-columns: repeat(5, minmax(0, 1fr)); }
