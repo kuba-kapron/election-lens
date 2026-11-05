@@ -267,6 +267,7 @@
       gArrows.style("--inv", 1 / e.transform.k);
       gPlaces.style("--inv", placeScale() / e.transform.k);
       sizeStripes(e.transform.k);
+      if (e.sourceEvent) hideTip();
     })
     .on("end", () => drawPlaces());
   svg.call(zoom).on("dblclick.zoom", null);
@@ -284,6 +285,34 @@
   }
 
   const tip = document.getElementById("tip");
+  // Map clicks and the tooltip. Mouse: the tooltip follows the pointer, a click opens the place.
+  // Touch: the first tap shows the place's tooltip, a second tap on the same place opens it.
+  let lastPointer = "mouse", tipKey = null;
+  const placeKey = f => { const t = clickTarget(f); return `${t.type}:${t.id}`; };
+  function hideTip() {
+    tip.hidden = true;
+    hoverPath.attr("d", null);
+    tipKey = null;
+  }
+  function mapHandlers(sel) {
+    return sel
+      .on("click", (e, f) => {
+        if (lastPointer === "touch" && tipKey !== placeKey(f)) {
+          showTip(e, f);
+          tipKey = placeKey(f);
+          return;
+        }
+        hideTip();
+        select(clickTarget(f), true);
+      })
+      .on("mousemove", (e, f) => { if (lastPointer !== "touch") showTip(e, f); })
+      .on("mouseleave", () => { if (lastPointer !== "touch") hideTip(); });
+  }
+  // what kind of pointer the next click comes from; 2: a tap outside the map's shapes closes the tooltip
+  window.addEventListener("pointerdown", e => {
+    lastPointer = e.pointerType || "mouse";
+    if (!e.target.closest?.("#map path")) hideTip();
+  }, true);
   const wrap = document.querySelector(".map-wrap");
 
   // ---------- city names ----------
@@ -360,17 +389,11 @@
     if (state.office !== "president") return drawCongressMap();
     gCounties.selectAll("path.county")
       .data(visibleShapes(state.year), f => f.properties.id)
-      .join(enter => enter.append("path").attr("class", "county").attr("d", path)
-        .on("click", (e, f) => select(clickTarget(f), true))
-        .on("mousemove", (e, f) => showTip(e, f))
-        .on("mouseleave", () => { tip.hidden = true; hoverPath.attr("d", null); }))
+      .join(enter => enter.append("path").attr("class", "county").attr("d", path).call(mapHandlers))
       .attr("fill", f => color(value(f.properties.id, y)));
     gStates.selectAll("path.state-fill")
       .data(states, f => f.properties.st)
-      .join(enter => enter.append("path").attr("class", "state-fill").attr("d", path)
-        .on("click", (e, f) => select(clickTarget(f), true))
-        .on("mousemove", (e, f) => showTip(e, f))
-        .on("mouseleave", () => { tip.hidden = true; hoverPath.attr("d", null); }))
+      .join(enter => enter.append("path").attr("class", "state-fill").attr("d", path).call(mapHandlers))
       .attr("fill", f => stateFill(f.properties.st, y));
     drawSelection();
     drawLegend();
@@ -521,6 +544,7 @@
   }
 
   function placeTip(e) {
+    if (lastPointer === "touch") tip.querySelectorAll(".hint").forEach(h => { h.textContent = h.textContent.replace(/^Click/, "Tap again"); });
     tip.hidden = false;
     const r = wrap.getBoundingClientRect();
     let x = e.clientX - r.left + 14, yy = e.clientY - r.top + 14;
@@ -863,14 +887,11 @@
     (state.office === "house" || (state.level === "states" && state.sel.type === "nation"));
 
   function drawCongressMap() {
-    const handlers = sel => sel
-      .on("click", (e, f) => select(clickTarget(f), true))
-      .on("mousemove", (e, f) => showTip(e, f))
-      .on("mouseleave", () => { tip.hidden = true; hoverPath.attr("d", null); });
+
     if (senLike()) {
       gCounties.selectAll("path.county")
         .data(visibleShapes(state.year), f => f.properties.id)
-        .join(enter => handlers(enter.append("path").attr("class", "county").attr("d", path)))
+        .join(enter => mapHandlers(enter.append("path").attr("class", "county").attr("d", path)))
         .attr("fill", f => {
           const r = senateRace(f.properties.st), l = countyLean(r, f.properties.id);
           // live: a county of a followed state with no votes yet is "not counted yet", not "no race"
@@ -878,7 +899,7 @@
         });
       gStates.selectAll("path.state-fill")
         .data(states, f => f.properties.st)
-        .join(enter => handlers(enter.append("path").attr("class", "state-fill").attr("d", path)))
+        .join(enter => mapHandlers(enter.append("path").attr("class", "state-fill").attr("d", path)))
         .attr("fill", f => {
           const r = senateRace(f.properties.st);
           if (isLive()) return liveFill(r);
@@ -888,7 +909,7 @@
       const races = hRaces();
       gDistricts.selectAll("path.district")
         .data(extra.districts[state.year], f => f.properties.id)
-        .join(enter => handlers(enter.append("path").attr("class", "district")))
+        .join(enter => mapHandlers(enter.append("path").attr("class", "district")))
         .attr("d", path) // district lines change from year to year
         .attr("fill", f => {
           const r = races[f.properties.id];
