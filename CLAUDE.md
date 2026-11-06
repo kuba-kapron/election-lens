@@ -226,7 +226,10 @@ Rules agreed with the owner:
   when a race panel is open, and again only when the office file's "trail_updated" changes. Step
   line of the leader's lead over the runner-up, scaled to the count from 5% of the latest total
   (earlier lopsided counts are clipped), dashed line at a change of source, hover box with the
-  numbers. --replay charts its test data, marked; a real run rebuilds the files from snapshots.
+  numbers and time. X axis: votes counted, not the clock (decided 6 November 2026): US sources'
+  "% counted" differ in meaning (precincts, polling places, civicAPI's expected vote), can go
+  backwards and sit at 100% while mail is counted. For a country with one national source the
+  share counted can be the axis (TRAIL_X = "pct" in app.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
 - Public copy: Cloudflare Pages (project election-lens), `pipeline/publish.sh --loop` uploads
   web/ every 150 s (about 200 of the free plan's 500 uploads a month per night); the importer
   runs separately. Page changes reach it only through that upload.

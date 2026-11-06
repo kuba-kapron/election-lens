@@ -159,6 +159,18 @@
     if (sel.type === "district") return districtName(sel.id);
     return name(sel);
   }
+  // where the map is: "United States › Ohio › Franklin County"; each level above is a link
+  const crumbsEl = document.getElementById("crumbs");
+  function drawCrumbs() {
+    const sel = state.sel, st = stateOf(sel), parts = [[{ type: "nation" }, "United States"]];
+    if (st) parts.push([{ type: "state", id: st }, data.states[st].name]);
+    if (sel.type === "county" && !SINGLE.has(st)) parts.push([sel, data.counties[sel.id]?.name ?? "Unknown"]);
+    if (sel.type === "district" && !atLarge(st)) parts.push([sel, `${districtName(sel.id, true)} district`]);
+    crumbsEl.innerHTML = parts.map(([, label], i) => i < parts.length - 1
+      ? `<button type="button" class="quiet" data-crumb="${i}">${label}</button><span class="sep" aria-hidden="true">›</span>`
+      : `<span aria-current="location">${label}</span>`).join("");
+    crumbsEl.querySelectorAll("[data-crumb]").forEach(b => b.addEventListener("click", () => select(parts[+b.dataset.crumb][0], true)));
+  }
   function headline(office, sel, where, special = false) {
     const k = sel.type === "nation" && office === "governor" ? "Governors" : OFFICE_HEAD[office];
     return `<p class="kicker">${k}${special ? " · special election" : ""}</p><h2>${placeName(sel)}</h2><p class="where">${where}</p>`;
@@ -665,8 +677,8 @@
       const other = v[2] - v[0] - v[1];
       html += `<div class="cand">
         ${byCount(v[0], v[1]).map(p => p === "dem"
-          ? candRow(fullName(c.dem) + partyTag("D"), v[0], v[2], colors.demSolid, won === "dem", c.dem)
-          : candRow(fullName(c.gop) + partyTag("R"), v[1], v[2], colors.gopSolid, won === "gop", c.gop)).join("")}
+          ? candRow(fullName(c.dem) + partyTag("D"), v[0], v[2], colors.demSolid, won === "dem", c.dem, null, v[0] - v[1])
+          : candRow(fullName(c.gop) + partyTag("R"), v[1], v[2], colors.gopSolid, won === "gop", c.gop, null, v[1] - v[0])).join("")}
         ${other > 0 ? candRow("Others", other, v[2], "var(--muted)") : ""}
       </div>
       <p class="note">${facts.join(" · ")}</p>`;
@@ -678,15 +690,7 @@
     const evChart = s.type === "nation" && categorical();
     html += `<h3>${evChart ? "Electoral votes in every election" : "Margin in every election"}</h3>${historyChart(s, evChart)}`;
 
-    const actions = [];
-    if (s.type === "county" && st !== "02" && st !== "11") actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
-    if (s.type !== "nation") actions.push(`<button class="quiet" data-act="nation">Show whole country</button>`);
-    if (actions.length) html += `<div class="actions">${actions.join("")}</div>`;
     panel.innerHTML = html;
-    panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () => {
-      if (b.dataset.act === "state") select({ type: "state", id: st }, true);
-      else select({ type: "nation" }, true);
-    }));
     panel.querySelectorAll("[data-year]").forEach(el => el.addEventListener("click", () => setYear(+el.dataset.year)));
   }
 
@@ -733,12 +737,14 @@
     return "The source has no data for it.";
   }
 
-  function candRow(label, votes, total, fill, winner = false, last = null, pic = null) {
+  // the leader's margin over the runner-up, in votes: " · +585,017" on the leader's row
+  const marginText = lead => (lead > 0 ? ` · <span class="lead" title="Margin over the runner-up">+${fmtInt(lead)}</span>` : "");
+  function candRow(label, votes, total, fill, winner = false, last = null, pic = null, lead = 0) {
     const share = votes / total;
     const mark = winner ? ` <span class="won">${CHECK}<span class="sr">winner</span></span>` : "";
     return `<div class="cand-row${winner ? " is-winner" : ""}">${pic ?? avatar(last, fill)}<div class="cand-main"><span class="name">${label}${mark}</span><span class="pct">${pct(share)}</span>
       <div class="bar"><span style="width:${share * 100}%;background:${fill}"></span></div>
-      <span class="votes">${fmtInt(votes)} votes</span></div></div>`;
+      <span class="votes">${fmtInt(votes)} votes${marginText(lead)}</span></div></div>`;
   }
 
   function historyChart(s, electoralVotes = false) {
@@ -1093,7 +1099,7 @@
       : peoplePhotos[c.photo] ? `<img src="img/people/${c.photo}.jpg" alt="" loading="lazy">` : "";
     return `<span class="avatar" style="background:${fill}" aria-hidden="true"><span class="ini">${ini.toUpperCase()}</span>${img}</span>`;
   }
-  function personRow(c, votes, total, winner) {
+  function personRow(c, votes, total, winner, lead = 0) {
     const fill = candFill(c);
     const mark = winner ? ` <span class="won">${CHECK}<span class="sr">winner</span></span>` : "";
     const facts = [];
@@ -1107,14 +1113,15 @@
     const share = total ? votes / total : 0;
     return `<div class="cand-row${winner ? " is-winner" : ""}">${initialsAvatar(c, fill)}<div class="cand-main"><span class="name">${c.name}${partyTag(c)}${mark}</span><span class="pct">${pct(share)}</span>
       <div class="bar"><span style="width:${share * 100}%;background:${fill}"></span></div>
-      <span class="votes">${fmtInt(votes)} votes${factText}</span></div></div>`;
+      <span class="votes">${fmtInt(votes)} votes${marginText(lead)}${factText}</span></div></div>`;
   }
   // candidates with at least 2% (and always the top two), then everyone else as "Others"
   function peopleRows(cands, votes, total, other, winner) {
     const order = votes.map((v, i) => i).sort((a, b) => votes[b] - votes[a]);
     const shown = order.filter((i, k) => k < 2 || (total && votes[i] / total >= 0.02));
     const rest = total - shown.reduce((a, i) => a + votes[i], 0);
-    let html = shown.map(i => personRow(cands[i], votes[i], total, i === winner)).join("");
+    const lead = order.length > 1 ? votes[order[0]] - votes[order[1]] : 0;
+    let html = shown.map((i, k) => personRow(cands[i], votes[i], total, i === winner, k === 0 ? lead : 0)).join("");
     if (rest > 0) html += candRow("Others", rest, total, "var(--muted)");
     return html;
   }
@@ -1267,14 +1274,8 @@
       const n = Object.keys(hRaces()).filter(id => id.startsWith(st + "-")).length;
       html = headline("house", s, `${y} · ${n} districts`) + houseStateBody(st);
     }
-    const actions = [];
-    if ((s.type === "county" && !SINGLE.has(st)) || (s.type === "district" && !atLarge(st))) actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
-    if (s.type !== "nation") actions.push(`<button class="quiet" data-act="nation">Show whole country</button>`);
-    if (actions.length) html += `<div class="actions">${actions.join("")}</div>`;
     panel.innerHTML = html;
 
-    panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () =>
-      select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
     panel.querySelectorAll(".tabs [data-seat]").forEach(b => b.addEventListener("click", () => {
       state.seat = b.dataset.seat;
       state.round = null;
@@ -1524,13 +1525,7 @@
       if (!r) html += `<p class="empty">No race followed in ${data.states[st].name} tonight.</p>`;
       else html += s.type === "state" ? liveRaceBody(r) : liveCountyBody(r, s.id);
     }
-    const actions = [];
-    if (s.type === "county" && !SINGLE.has(st)) actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
-    if (s.type !== "nation") actions.push(`<button class="quiet" data-act="nation">Show whole country</button>`);
-    if (actions.length) html += `<div class="actions">${actions.join("")}</div>`;
     panel.innerHTML = html;
-    panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () =>
-      select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
     panel.querySelectorAll(".tabs [data-seat]").forEach(b => b.addEventListener("click", () => {
       state.seat = b.dataset.seat;
       drawMap();
@@ -1580,9 +1575,9 @@
     svg.addEventListener("pointerleave", hide);
     svg.addEventListener("pointermove", ev => {
       const box = svg.getBoundingClientRect(), k = info.w / box.width;
-      const t = info.x.invert((ev.clientX - box.left) * k);
-      const i = Math.max(0, d3.bisector(p => p.t).right(info.pts, +t) - 1), p = info.pts[i];
-      const px = info.x(p.t), py = info.y(Math.max(-info.M, Math.min(info.M, p.m)));
+      // the update nearest the pointer along the count (totals can dip at a change of source)
+      const at = (ev.clientX - box.left) * k, p = d3.least(info.pts, q => Math.abs(info.x(q.v) - at));
+      const px = info.x(p.v), py = info.y(Math.max(-info.M, Math.min(info.M, p.m)));
       mark.setAttribute("visibility", "visible");
       mark.querySelector("line").setAttribute("x1", px);
       mark.querySelector("line").setAttribute("x2", px);
@@ -1601,6 +1596,13 @@
       tip.style.right = right ? `${box.width - left + 10}px` : "";
     });
   }
+  // the chart's x axis: votes counted (every US source gives it, it only grows, it means the same
+  // in every race). "pct" suits a country with one national source whose share counted is consistent
+  const TRAIL_X = "total";
+  const TRAIL_AXIS = {
+    total: { value: p => p.total, tick: d3.format("~s") },             // 0, 500k, 1M
+    pct: { value: p => p.pct, max: 100, tick: v => `${v}%` },          // 0%, 50%, 100%
+  };
   function trailChart(tr, id) {
     const race = Object.values(liveFile()?.races || {}).find(x => x.id === id) || liveFile()?.races?.[id];
     const last = tr.pts[tr.pts.length - 1], n = tr.cands.length;
@@ -1610,24 +1612,38 @@
     if (b == null) return "";
     const person = name => race?.cands.find(c => c.name === name) || { name, party: "O", caucus: "I" };
     const ca = person(tr.cands[a]), cb = person(tr.cands[b]);
-    const pts = tr.pts.map(p => ({ t: p[0] * 1000, m: p[2] ? 100 * (vote(p, a) - vote(p, b)) / p[2] : 0, src: p[3], total: p[2], pct: p[1] }));
+    const ax = TRAIL_AXIS[TRAIL_X];
+    const pts = tr.pts.map(p => ({ t: p[0] * 1000, m: p[2] ? 100 * (vote(p, a) - vote(p, b)) / p[2] : 0, src: p[3], total: p[2], pct: p[1] }))
+      .map(p => ({ ...p, v: ax.value(p) })).filter(p => p.v != null);
+    if (!pts.length) return "";
     const w = 300, h = 150, left = 4, right = 34, top = 14, bottom = 20;
-    const t1 = Math.max(pts[pts.length - 1].t, Math.min(Date.now(), pts[pts.length - 1].t + 6 * 3600e3));
-    const x = d3.scaleTime().domain([pts[0].t, Math.max(t1, pts[0].t + 30 * 60e3)]).range([left, w - right]);
+    // x: how much is counted, from nothing to the latest count
+    const x = d3.scaleLinear().domain([0, Math.max(ax.max ?? 0, d3.max(pts, p => p.v)) || 1]).range([left, w - right]);
     // scale to the count once 5% of the latest total is in: the first few counties are often
     // lopsided and would flatten the rest of the night; earlier points run off the chart (clipped)
     const settled = pts.filter(p => p.total >= 0.05 * pts[pts.length - 1].total);
     const M = Math.max(2, Math.ceil(d3.max(settled.length ? settled : pts, p => Math.abs(p.m)) * 1.15));
     const y = d3.scaleLinear().domain([-M, M]).range([h - bottom, top]);
-    // hold the last count until now (not into the future)
-    const end = Math.min(Date.now(), +x.domain()[1]);
-    const steps = end > pts[pts.length - 1].t ? pts.concat([{ ...pts[pts.length - 1], t: end }]) : pts;
-    const line = d3.line().x(p => x(p.t)).y(p => y(p.m)).curve(d3.curveStepAfter)(steps);
-    const area = d3.area().x(p => x(p.t)).y0(y(0)).y1(p => y(p.m)).curve(d3.curveStepAfter)(steps);
+    // straight from one update to the next: the votes in between came in with that batch
+    const line = d3.line().x(p => x(p.v)).y(p => y(p.m))(pts);
+    const area = d3.area().x(p => x(p.v)).y0(y(0)).y1(p => y(p.m))(pts);
+    // dots where updates are, only where there is room (at least 9 units from the last dot);
+    // the first, the last and each change of source always get one. Hover snaps to every update
+    const at = p => [x(p.v), y(Math.max(-M, Math.min(M, p.m)))];
+    const dots = [];
+    pts.forEach((p, i) => {
+      if (Math.abs(p.m) > M) return;  // early lopsided counts run off the chart: no dot at its edge
+      const [px, py] = at(p), prev = dots[dots.length - 1];
+      const must = i === 0 || i === pts.length - 1 || p.src !== pts[i - 1].src;
+      if (must || !prev || Math.hypot(px - prev[0], py - prev[1]) >= 9) {
+        if (i === pts.length - 1 && prev && Math.hypot(px - prev[0], py - prev[1]) < 9) dots.pop();  // the last one wins its spot
+        dots.push([px, py]);
+      }
+    });
     const cid = `tc-${id}`.replace(/[^\w-]/g, "");
     const switches = pts.filter((p, i) => i && p.src !== pts[i - 1].src).map(p =>
-      `<line class="src" x1="${x(p.t)}" x2="${x(p.t)}" y1="${top - 4}" y2="${h - bottom}"><title>From here: ${tr.srcs[p.src]}</title></line>`).join("");
-    const ticks = x.ticks(4).map(t => `<text x="${x(t)}" y="${h - 5}" text-anchor="middle">${clock(t.toISOString())}</text>`).join("");
+      `<line class="src" x1="${x(p.v)}" x2="${x(p.v)}" y1="${top - 4}" y2="${h - bottom}"><title>From here: ${tr.srcs[p.src]}</title></line>`).join("");
+    const ticks = x.ticks(4).map(t => `<text x="${x(t)}" y="${h - 5}" text-anchor="middle">${ax.tick(t)}</text>`).join("");
     trailInfo = { pts, x, y, M, w, ca, cb, srcs: tr.srcs };
     const last2 = (s, c) => `<tspan fill="${candFill(c)}" font-weight="700">${c.last || c.name}</tspan>${s}`;
     return `<h3>Through the night</h3>
@@ -1640,6 +1656,7 @@
         <line class="zero" x1="${left}" x2="${w - right}" y1="${y(0)}" y2="${y(0)}"/>
         ${switches}
         <path d="${line}" fill="none" stroke="var(--ink)" stroke-width="1.6" clip-path="url(#${cid}-in)"/>
+        <g class="dots" clip-path="url(#${cid}-in)">${dots.map(([px, py]) => `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="2"/>`).join("")}</g>
         <text x="${left}" y="${top - 3}">${last2(" ahead", ca)}</text>
         <text x="${left}" y="${h - bottom - 4}">${last2(" ahead", cb)}</text>
         <text x="${w - right + 4}" y="${y(M) + 8}">+${M}</text><text x="${w - right + 4}" y="${y(0) + 4}">0</text><text x="${w - right + 4}" y="${y(-M)}">+${M}</text>
@@ -1694,13 +1711,7 @@
         ${tugBar(tt, ds.length, "", ds.map(([, r]) => r), "districts")}${t.none ? `<p class="tug-other">${t.none} with no votes counted yet.</p>` : ""}${popSection(houseVotes(ds.map(([, r]) => r)), true)}${notesList(ds[0]?.[1].notes)}
         <section data-races><h3>Districts</h3><ul class="race-list">${items.join("")}</ul></section>`;
     }
-    const actions = [];
-    if (s.type === "district" && !atLarge(st)) actions.push(`<button class="quiet" data-act="state">Show ${data.states[st].name}</button>`);
-    if (s.type !== "nation") actions.push(`<button class="quiet" data-act="nation">Show whole country</button>`);
-    if (actions.length) html += `<div class="actions">${actions.join("")}</div>`;
     panel.innerHTML = html;
-    panel.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", () =>
-      select(b.dataset.act === "state" ? { type: "state", id: st } : { type: "nation" }, true)));
     panel.querySelectorAll("[data-dist]").forEach(b => b.addEventListener("click", () => select({ type: "district", id: b.dataset.dist }, true)));
     panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => setYear(+b.dataset.prevYear)));
     fillTrail();
@@ -1723,7 +1734,7 @@
     <input id="state-find" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list"
       aria-controls="state-options" aria-label="Find a state" placeholder="Find a state" autocomplete="off" spellcheck="false">
     <ul id="state-options" role="listbox" aria-label="States" hidden></ul>`;
-  tools.insertBefore(combo, document.getElementById("reset"));
+  tools.append(combo);
   const finder = combo.querySelector("input");
   const listbox = combo.querySelector("ul");
   const stateList = Object.entries(data.states)
@@ -1810,7 +1821,7 @@
       else zoomTo(st ? stateById.get(st) : null);
     }
     syncFinder();
-    document.getElementById("reset").hidden = sel.type === "nation";
+    drawCrumbs();
     if (state.office !== "president") drawMap(); // a Senate state's counties follow the race chosen in the panel
     drawSelection();
     drawLegend();
@@ -1951,7 +1962,6 @@
   document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
   document.querySelectorAll("[data-level]").forEach(b => b.addEventListener("click", () => setLevel(b.dataset.level)));
   document.querySelectorAll("[data-cmap]").forEach(b => b.addEventListener("click", () => setCmap(b.dataset.cmap)));
-  document.getElementById("reset").addEventListener("click", () => select({ type: "nation" }, true));
   document.addEventListener("keydown", e => {
     if (e.target.closest("select, input, textarea")) return;
     const ys = curYears(), i = ys.indexOf(state.year);

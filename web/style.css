@@ -299,6 +299,11 @@ h1 {
 .mode button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
 
 .combo { position: relative; margin-left: auto; width: 220px; }
+/* breadcrumb above the map: United States › Ohio › Franklin County */
+.crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: 14px; }
+.crumbs .quiet { padding: 2px 0; }
+.crumbs .sep { color: var(--muted); }
+.crumbs [aria-current] { font-weight: 700; }
 
 .combo input {
   width: 100%;
@@ -536,9 +541,9 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .trail-chart { touch-action: pan-y; }
 .trail-chart .mark line { stroke: var(--muted); }
 .trail-chart .mark circle { fill: var(--ink); }
+.trail-chart .dots circle { fill: var(--ink); }
 .trail-tip { white-space: nowrap; }
 
-.panel .actions { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 
 /* Tabs inside the panel: regular/special race, election rounds */
 .tabs { margin-top: 12px; display: flex; flex-wrap: wrap; }
