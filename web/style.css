@@ -562,8 +562,22 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 /* the list's title with its order switch (A–Z | Closest | D → R) on the right */
 .races-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
 .races-head h3 { margin: 0; }
+/* long lists: first rows, "Show all", and a filter field next to the title */
+.races-head .list-search { flex: 1 1 160px; max-width: 260px; margin-right: auto; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 10px; }
+.race-list:not(.open):not(.searching) li.more, .race-list.searching li:not(.match) { display: none; }
+/* "Show all" / "Show fewer": one pill under the list; open, it floats at the bottom of the
+   screen while the list is in view */
+.list-more { display: block; margin: 10px auto 0; padding: 6px 14px; font-size: 14px; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 999px; text-decoration: none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25); }
+.list-more[aria-expanded="true"] { position: sticky; bottom: 16px; }
+.list-none { margin: 8px 0 0; }
 .races .race-list { columns: 260px 4; column-gap: 32px; }
 .races .race-list li { break-inside: avoid; }
+/* history card with a chart: the chart, then the list beside it (under it on phones) */
+.hist-body { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 16px 40px; align-items: start; }
+.hist-body .race-list { columns: 260px 2; }
+@media (max-width: 700px) { .hist-body { grid-template-columns: minmax(0, 1fr); } }
 
 /* Lists of races (a state's districts, a state's Senate races, tonight's races) */
 .race-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
@@ -573,6 +587,8 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .race-list button:hover .who { text-decoration: underline; }
 .race-list .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .race-list .what { color: var(--muted); }
+/* the place in view, in a list of the level above it */
+.race-list [aria-current="true"] .who, .race-list [aria-current="true"] .what { font-weight: 700; color: var(--ink); }
 /* columns: label | name | status (✓ for a called race, else the share counted) | margin. Status
    and margin have fixed widths so checkmarks line up down the list; lists without any status
    (past years) leave that column out */
@@ -580,7 +596,11 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .race-list:not(:has(.status:not(:empty))) { --race-cols: var(--what) minmax(0, 1fr) minmax(4.2em, auto); }
 /* a list with a new seat ("38th new") gets a wider label column */
 .race-list:has(.what .new) { --what: 6.4em; }
-.race-list .what .new { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+/* county names: a wider label, cut with "…" when even that is too short */
+.race-list.places { --what: 8em; }
+.race-list.places .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race-list:has(.what .old) { --what: 8em; }
+.race-list .what .new, .race-list .what .old { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
 .race-list:not(:has(.status:not(:empty))) .status { display: none; }
 .race-list .status { white-space: nowrap; text-align: center; }
 .race-list .mg { text-align: right; }
@@ -685,7 +705,7 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .years button[aria-current="true"] .yr { text-decoration: underline 3px; text-underline-offset: 5px; }
   .mode button { padding: 6px 8px; font-size: 13px; }
   .combo { width: 100%; margin-left: 0; }
-  .combo input { font-size: 16px; } /* below 16px iOS Safari zooms the page on focus */
+  .combo input, .races-head .list-search { font-size: 16px; } /* below 16px iOS Safari zooms the page on focus */
 }
 
 @media (prefers-reduced-motion: reduce) {

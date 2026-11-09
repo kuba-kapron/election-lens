@@ -43,6 +43,14 @@ US presidential results 2000–2024 on one static page (`web/`):
   Margin) links still work.
 - Panel headlines: the office in small capitals above the place ("U.S. SENATE" over
   "Georgia", "GOVERNOR" over "Fulton County, GA"), year and update time in the grey line.
+- Under the map and panel, two cards (decided November 9, 2026): **Races** lists every race at
+  the map's level (country: states, races or all 435 districts; a state: its counties or
+  districts; at the lowest level, the level above with this place marked), sortable
+  A–Z | Closest | D → R (each reverses on a second click), first 40 rows with Show all and a
+  filter on longer lists. **History** shows the same race at the same level in every election:
+  one shared bar chart and rows (tonight included as counted so far; district numbers on
+  another map faded). Country charts switch Seats | Popular vote on the card, starting from the
+  map's Winner | Margin.
 
 ## Layout
 
