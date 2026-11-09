@@ -2,7 +2,7 @@
 
 Open-source (AGPL-3.0) website for exploring election results at every level, from the whole
 country down to counties, and for following elections live. A hobby and portfolio project by
-the repository owner. Started in a claude.ai conversation on 29–31 October 2026; this file
+the repository owner. Started in a claude.ai conversation on October 29–31, 2026; this file
 carries over what was decided there.
 
 ## What exists now
@@ -19,7 +19,7 @@ US presidential results 2000–2024 on one static page (`web/`):
   zoomed). Winner colors states only (the county map shows the margin). Maine and Nebraska
   show a badge with the second candidate's district electoral votes in split years.
   The year ribbon follows the map: electoral votes or seats under Winner, the popular-vote
-  margin under Margin and Shift. (Decided 4 November 2026; replaced the panel's Electoral
+  margin under Margin and Shift. (Decided November 4, 2026; replaced the panel's Electoral
   College | Popular vote and Seats | Popular vote tabs.)
 - Country panels: electoral votes (president) or one totals bar per office (Senate, House,
   governors; also a state's House delegation): logos and big counts of certain seats, ▲ gained
@@ -32,8 +32,8 @@ US presidential results 2000–2024 on one static page (`web/`):
   races (President | Senate | House | Governor) are the site navigation in the top bar next
   to the wordmark (own row on phones); races without data that year are greyed out
   with the reason on hover. Switching years keeps the race when that year has it, else
-  President, else Senate (decided with the owner on 3 November 2026).
-- City names on the map (added 3 November 2026): the largest metros for the whole country,
+  President, else Senate (decided with the owner on November 3, 2026).
+- City names on the map (added November 3, 2026): the largest metros for the whole country,
   more as you zoom in; the selected state's cities first, neighbors in grey; a name goes right
   of its dot, else left, below or above, never over another name, and avoids covering other
   cities' dots; same screen size at every zoom and screen width. Alaska and Hawaii cities show
@@ -102,11 +102,15 @@ Safari caches aggressively: reload with Cmd+Option+R after changes.
 - Seats changing party: "Pickup" tonight, "Flipped" for past years. Checkmarks only on
   tonight's called races (past winners are obvious). One shared component per kind of
   display (the totals bar, the race grey line), so views stay alike across years and levels.
+- Dates in American style everywhere, site and notes: "November 3, 2026", no "3rd"
+  (decided November 6, 2026; other languages may come later, with their own formats).
+  Possessives AP style: a name ending in "s" takes only the apostrophe ("Texas' 13th
+  district"), built with `possessive()` in app.js.
 - Check changes in a browser at desktop and phone widths, in light and dark mode.
 
 ## Senate and House results 2020–2024
 
-Built 31 October 2026 (office switch President | Senate | House on the page, `#race=senate`).
+Built October 31, 2026 (office switch President | Senate | House on the page, `#race=senate`).
 Official figures: FEC (2020, 2022) and Clerk of the House (2024); each build cross-checks
 sources and asserts seats, Senate control and flips against documented totals.
 Decided with the owner:
@@ -132,9 +136,9 @@ Decided with the owner:
   dates because the FEC's mark is wrong in about 25 places (special-election winners, all of
   Arizona and Nebraska in 2024, open seats in Delaware and Oregon 2024).
 
-## Live results, US midterms, 3 November 2026 (built 3 November)
+## Live results, US midterms, November 3, 2026 (built November 3)
 
-Polls close from about 00:00 Warsaw time on 4 November. All 35 Senate races (Florida and Ohio
+Polls close from about 00:00 Warsaw time on November 4. All 35 Senate races (Florida and Ohio
 are specials) and the governor races in Ohio and Texas. The first twelve (Senate in TX, MI, GA,
 NC, SC, FL, LA, MS, ME, OH; governor in OH, TX) were the owner's list; the other 25 Senate
 races were added the same day, from civicAPI only. Poll closing times: CBS News. Page: year 2026, Senate or Governor
@@ -161,10 +165,10 @@ Rules agreed with the owner:
   state/county sites and sometimes local media) as fallback, always labeled; its test data is
   never shown as real. Manual entries override both and name their source.
 - No race calls of our own: a race is marked won only when entered by hand with who called it.
-- Governor races (all 36, added 3 November): official readers where the state has one for the
+- Governor races (all 36, added November 3): official readers where the state has one for the
   governor contest (SC, IA, GA, FL, OR, SD, RI, TX, NY, MD, AZ), else civicAPI. No governor
   history yet, so no "last time" comparison.
-- Official live sources (surveyed 3 November, each tested on an earlier election where the
+- Official live sources (surveyed November 3, each tested on an earlier election where the
   site keeps one): NC, SC, FL, TX, GA, VA, IA, DE, SD, OR, RI; for governor also NY (plain
   results page), MD (results page), AZ (Enhanced Voting, report not yet published).
   Also checked: CA (refuses scripts, 403), PA (certificate fails verification; not bypassed),
@@ -190,7 +194,7 @@ Rules agreed with the owner:
   and nothing stops.
   Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
   (Vice President Vance breaks ties).
-- House (added 3 November): all 435 races from one civicAPI request per round (its race search,
+- House (added November 3): all 435 races from one civicAPI request per round (its race search,
   type "House of Representatives"), then official results replace them district by district
   for 16 states (pipeline/live_house.py: NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT
   from the files already read for Senate/governor; WA, IN, ND for the House only; 182
@@ -199,7 +203,7 @@ Rules agreed with the owner:
   Enhanced Voting (results.votewa.gov, election "20261103"), no earlier general there to test.
   Indiana: the results app's JSON (data/settings.json gives the version letter, then
   OffCatC_1005_<letter>.json), no precinct counts. North Dakota: statewide results page, read
-  only when its hidden election date is 11/3/2026 (it showed 2024 on 3 November; tested on that
+  only when its hidden election date is 11/3/2026 (it showed 2024 on November 3; tested on that
   page, matches the certified 2024 result exactly). Missouri refuses scripts. Tested against certified 2024 House
   results where the site keeps 2024: NC, SC, IA, FL, GA, VA, every contested district within
   0.5%. Florida's file is in the Windows character set (cp1252). Not yet: AZ, RI (report
@@ -207,18 +211,18 @@ Rules agreed with the owner:
   keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.
-  Louisiana's House vote on 3 November is an all-candidate primary (general 12 December).
+  Louisiana's House vote on November 3 is an all-candidate primary (general December 12).
 - Record of the night (not committed): each changed source file, gzipped, at most one version
   per source every 10 minutes and 1 GB in all (data/raw/live/archive/<key>/<UTC time>.gz, with
   url.txt), so readers can be fixed and the night re-read without asking the sites again; and
   each office's file after every round that changed more than fetch times
   (data/live/snapshots/<office>/, 20-80 KB each). Not in --replay. Saving never stops the importer.
-- Live files, one per office (decided 3 November, so a viewer re-reads only the office in view,
+- Live files, one per office (decided November 3, so a viewer re-reads only the office in view,
   every 30 seconds): web/data/live/senate.json, governor.json, house.json, each
   {"office", "year", "updated", "races": {id: race}, "night"}; ids "GA-sen", "TX-gov", "13-05".
   The Senate file also has "not_up" (the balance); "night" (any votes yet, Senate calls) is
   repeated in every file for the year ribbon.
-- Race charts ("Through the night", added 3 November): web/data/live/trail-<office>.json, built by
+- Race charts ("Through the night", added November 3): web/data/live/trail-<office>.json, built by
   pipeline/live_trail.py from the snapshots when the importer starts (a restart loses nothing)
   and extended every round. Per race: candidates in first-seen order, sources, and points
   [unix time, % counted, total, source index, votes...], added only when the numbers change and
@@ -226,14 +230,14 @@ Rules agreed with the owner:
   when a race panel is open, and again only when the office file's "trail_updated" changes. Step
   line of the leader's lead over the runner-up, scaled to the count from 5% of the latest total
   (earlier lopsided counts are clipped), dashed line at a change of source, hover box with the
-  numbers and time. X axis: votes counted, not the clock (decided 6 November 2026): US sources'
+  numbers and time. X axis: votes counted, not the clock (decided November 6, 2026): US sources'
   "% counted" differ in meaning (precincts, polling places, civicAPI's expected vote), can go
   backwards and sit at 100% while mail is counted. For a country with one national source the
   share counted can be the axis (TRAIL_X = "pct" in app.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
 - Public copy: Cloudflare Pages (project election-lens), `pipeline/publish.sh --loop` uploads
   web/ every 150 s (about 200 of the free plan's 500 uploads a month per night); the importer
   runs separately. Page changes reach it only through that upload.
-- Added on election night (4 November): a source that had votes and then fails keeps its last
+- Added on election night (November 4): a source that had votes and then fails keeps its last
   reading (Virginia's report list is briefly empty while it publishes); timeouts and 5xx are
   "slow" (cached copy kept, site paused 3 min), not refusals. civicAPI was overloaded: one race
   took ~36 s and the all-states House list returned 502s, so House lists are asked one state at
@@ -243,11 +247,18 @@ Rules agreed with the owner:
   county precincts (its summary counts fully reported counties). A source may drop half of a
   double surname (NY's "Joel Azumah" for Anabilah-Azumah). Florida moved election night to
   floridaelectionwatch.gov behind a Cloudflare bot check: not used (civicAPI instead).
-- Pickups: a called race won by the other party than last time (Senate seat history; House
-  same district where the map did not change; governors from web/data/governor.json, 2022, or
-  2024 for NH and VT). Seats with no earlier result are left out, noted under the legend.
+- Pickups: a called race won by the other party than last time (Senate seat history; governors
+  from web/data/governor.json, 2022, or 2024 for NH and VT). Seats with no earlier result are
+  left out, noted under the legend.
+- House seats, past years and tonight (decided November 7, 2026, after Wikipedia's approach):
+  previous holder = the one incumbent running (the party of their last win, e.g. Kiley ran
+  without a party in 2026), else the last winner of the same district number (approximate
+  on a redrawn map), else a new seat ("new" in lists, "New seat" in the panel). The legend
+  note names the redrawn states. House cards show one net number per party: seats won minus
+  seats won last time once every race in view is decided; while counting, called races against
+  their previous holders (the map's pickups). Senate and governors keep ▲ gained ▼ lost.
 
-Governor history (started 4 November 2026 for tonight's pickups): MEDSL official precinct
+Governor history (started November 4, 2026 for tonight's pickups): MEDSL official precinct
 returns on GitHub, 2018 (all states' state offices, one zip), 2022 and 2024 (per state, only the
 states with a governor race), summed to the state by build_governor.py. Fusion lines summed per
 candidate; New Mexico 2022 has no party labels (taken from the same people's other MEDSL
@@ -258,7 +269,7 @@ pages for past years. Even years only for now (2021/2023 odd-year races later).
 
 Also after election night: tidy pipeline/ into topic folders (common/ with the polite fetcher,
 xlsx and state codes; president/, congress/, photos/, live/), run as `uv run -m pipeline.<topic>.<script>`;
-check that every build's output is byte-for-byte unchanged. Agreed 3 November 2026, postponed so
+check that every build's output is byte-for-byte unchanged. Agreed November 3, 2026, postponed so
 tonight's tested live scripts and checklist stay as they are.
 
 Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland

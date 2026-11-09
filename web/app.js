@@ -27,6 +27,7 @@
     try { d = await d3.json(`data/live/${office}.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
     extra.live = extra.live || {};
     extra.live[office] = { races: d?.races || {}, notUp: d?.not_up || null, updated: d?.updated || null, trailUpdated: d?.trail_updated || null };
+    if (office === "house") for (const [id, r] of Object.entries(extra.live.house.races)) r.id = id;  // the seat rule needs the district
     if (d?.night) extra.live.night = d.night;
   }
   const liveFile = (o = state.office) => extra.live?.[liveOffice(o)];
@@ -53,16 +54,34 @@
       extra.districts[year] = need.flatMap(py => extra.planFiles[py].filter(f => use[f.properties.st] === py));
     }
   }
-  // Past House races: "held" = the party that won the same district two years earlier, only where
-  // the state kept its map (plans.json); as Senate races carry it from their seat history.
-  // Unknown (no earlier year, or a new map) stays unset: no flip is shown or counted.
+  // Who held a House seat before this election (past years and tonight, one rule):
+  // 1. exactly one incumbent running: their party (they may have moved district on a new map);
+  // 2. otherwise (no incumbent, or two thrown together by a new map): the last winner of the
+  //    same district number, which on a redrawn map is approximate (noted under the legend);
+  // 3. a district number that did not exist last time: a new seat, no earlier holder.
+  // null when there is no earlier year (2020).
+  const redrawn = (st, y) => !!extra.plans?.[String(+y - 2)] && extra.plans[String(y)]?.[st] !== extra.plans[String(+y - 2)][st];
+  function houseHolder(id, cands, y) {
+    const prevY = +y - 2, before = extra.house?.races[String(prevY)];
+    if (!before) return null;
+    const inc = cands.filter(c => c.inc);
+    if (inc.length === 1) {
+      // the party they held the seat with: their last win (Congress ID, else name), not this
+      // year's label (Kevin Kiley ran without a party in 2026, after winning as a Republican)
+      const c = inc[0], same = w => (c.bio && w.bio ? c.bio === w.bio : w.name === c.name);
+      const last = Object.values(before).map(b => b.cands[0]).find(same);
+      return { caucus: last?.caucus || c.caucus, name: c.name, how: "incumbent" };
+    }
+    const w = before[id]?.cands[0];
+    if (!w) return { newSeat: true };
+    return { caucus: w.caucus, name: w.name, year: prevY, how: redrawn(id.slice(0, 2), y) ? "number" : "same" };
+  }
+  // past years: r.held (the caucus) and r.holder (the details) on every race
   function markHouseHeld() {
     for (const [y, races] of Object.entries(extra.house.races)) {
-      const prev = String(+y - 2), before = extra.house.races[prev];
-      if (!before || !extra.plans[y] || !extra.plans[prev]) continue;
       for (const [id, r] of Object.entries(races)) {
-        const st = id.slice(0, 2);
-        if (extra.plans[y][st] === extra.plans[prev][st] && before[id]) r.held = before[id].cands[0].caucus;
+        r.holder = houseHolder(id, r.cands, y);
+        r.held = r.holder?.caucus;
       }
     }
   }
@@ -550,7 +569,7 @@
       ? (() => { const [ed, er] = ec(state.year).states[target.id]; return `<span class="flip">Split: ${c.gop} ${er}, ${c.dem} ${ed} electoral votes</span>`; })()
       : "";
     const flip = from ? `<span class="flip">Flipped from ${from === "dem" ? "Democrats" : "Republicans"} since ${prevYear(state.year)}</span>` : "";
-    const hint = target.type === "state" && !SINGLE.has(target.id) ? `<span class="hint">Click to see ${st.name}'s counties</span>` : "";
+    const hint = target.type === "state" && !SINGLE.has(target.id) ? `<span class="hint">Click to see ${possessive(st.name)} counties</span>` : "";
     tip.innerHTML = `<strong>${label}</strong>${body}${split}${flip}${hint}`;
     placeTip(e);
   }
@@ -629,11 +648,26 @@
   const racesEl = document.getElementById("races");
   function drawPanel() {
     drawPanelBody();
+    // a row in a whole-country race list opens that state's race (past years and tonight)
+    panel.querySelectorAll("[data-race-st]").forEach(b => b.addEventListener("click", () => {
+      select({ type: "state", id: b.dataset.raceSt }, true);
+      state.seat = b.dataset.raceSeat;
+      drawMap();
+      drawPanel();
+      writeHash();
+    }));
+    panel.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => {
+      raceSort = b.dataset.sort;
+      try { localStorage.setItem("raceSort", raceSort); } catch (e) { /* private mode: this visit only */ }
+      drawPanel();
+    }));
     const sec = panel.querySelector("[data-races]");
     racesEl.replaceChildren(...(sec ? sec.childNodes : []));
     sec?.remove();
     racesEl.hidden = !sec;
     splitPanel();
+    fitNames();
+    drawPhotoCredits();
   }
   // the panel in two parts: the headline with the first numbers (totals bar, or the candidates
   // and their grey line), then the rest. One card on wide screens; on narrow ones CSS puts the
@@ -789,15 +823,67 @@
   const CAUCUS_NAME = { D: "Democrats", R: "Republicans", I: "Independents" };
   const SHORT_NAME = { D: "Dems", R: "GOP", I: "Others" };
   // totals bars: full party names, or "Dems" and "GOP" (both together) when either does not fit
-  function fitPartyNames() {
-    document.querySelectorAll(".tug-head").forEach(h => {
-      const names = [...h.querySelectorAll(".pname")];
-      names.forEach(n => { n.textContent = n.dataset.full; n.title = ""; });
-      if (names.some(n => n.scrollWidth > n.clientWidth + 1))
-        names.forEach(n => { n.textContent = n.dataset.short; n.title = n.dataset.full; });
-    });
+  // Names that switch to a shorter form when the full one does not fit (full form on hover).
+  // data-forms lists the forms, longest first, split by "|": party names in a totals bar
+  // ("Democrats|Dems", both sides take the same step) and people in race lists
+  // ("Shelley Moore Capito|Shelley M. Capito|S. Capito|Capito"); data-title is hover text kept at every step
+  function fitNames() {
+    const forms = n => n.dataset.forms.split("|");
+    const show = (n, i) => {
+      const f = forms(n);
+      n.textContent = f[Math.min(i, f.length - 1)];
+      n.title = [i ? f[0] : "", n.dataset.title || ""].filter(Boolean).join(" · ");
+    };
+    // content wider than its box, to the fraction of a pixel (the browser cuts it with "…" even
+    // when it is only half a pixel over; scrollWidth rounds that away). Measures the row's own
+    // pieces: an element's box leaves out hidden screen-reader text placed elsewhere on the page
+    const over = el => {
+      const box = el.getBoundingClientRect(), range = document.createRange();
+      let right = box.left;
+      for (const n of el.childNodes) {
+        let r;
+        if (n.nodeType === 3) { range.selectNodeContents(n); r = range.getBoundingClientRect(); }
+        else if (n.nodeType === 1 && getComputedStyle(n).position !== "absolute") r = n.getBoundingClientRect();
+        if (r && r.width) right = Math.max(right, r.right);
+      }
+      return right > box.left + el.clientWidth + 0.01;
+    };
+    const fit = (names, box) => {
+      const steps = Math.max(...names.map(n => forms(n).length));
+      for (let i = 0; i < steps; i++) {
+        names.forEach(n => show(n, i));
+        if (!names.some(n => over(box(n)))) return;
+      }
+    };
+    document.querySelectorAll(".tug-head").forEach(h => fit([...h.querySelectorAll(".pname")], n => n));
+    document.querySelectorAll(".who .fit").forEach(n => fit([n], n => n.closest(".who")));
   }
-  window.addEventListener("resize", () => fitPartyNames());
+  // measure again whenever the cards change width (window, phone rotation, columns) and once the
+  // page font has loaded: measured with the narrower fallback font, everything seems to fit
+  {
+    const widths = new WeakMap();
+    const ro = new ResizeObserver(entries => {
+      if (entries.some(e => widths.get(e.target) !== e.contentRect.width && (widths.set(e.target, e.contentRect.width), true))) fitNames();
+    });
+    [document.body, document.getElementById("races")].forEach(el => ro.observe(el));  // the panel has no box of its own on phones
+    document.fonts?.ready.then(fitNames);
+    document.fonts?.addEventListener("loadingdone", fitNames);  // "ready" can come before loading starts
+  }
+  const attr = t => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  // a person's name for a race list: full, middle names as initials, first initial, last name
+  const SUFFIX = /^(jr|sr|ii|iii|iv)\.?$/i;
+  const PARTICLE = /^(van|von|de|del|della|der|den|da|di|du|la|le|st\.?)$/i;
+  function fitName(c) {
+    const words = c.name.split(" ").filter(w => !SUFFIX.test(w));
+    let last = c.last && c.name.includes(c.last) ? c.last : words[words.length - 1];
+    // particles belong to the surname: "Van Epps", "De La Cruz"
+    for (let i = words.indexOf(last.split(" ")[0]) - 1; i > 0 && PARTICLE.test(words[i]); i--) last = `${words[i]} ${last}`;
+    const given = words.join(" ").slice(0, words.join(" ").lastIndexOf(last)).trim().split(" ").filter(Boolean);
+    const mid = given.length > 1 ? [given[0], ...given.slice(1).map(w => (w.endsWith(".") ? w : w[0] + ".")), last].join(" ") : null;
+    const initial = given.length ? `${given[0][0]}. ${last}` : null;  // "S. Capito"
+    const list = [c.name, mid, initial, last].filter((f, i, a) => f && a.indexOf(f) === i);
+    return `<span class="fit" data-forms="${attr(list.join("|"))}">${c.name}</span>`;
+  }
   // Party after a name: the letter, "(D)", then its icon from img/parties/ when there is one.
   // Takes a party code or a candidate.
   const PARTY_NAME = { D: "Democratic Party", R: "Republican Party", L: "Libertarian Party", G: "Green Party", I: "Independent" };
@@ -812,10 +898,12 @@
     ? `<span class="avatar party-pic" aria-hidden="true"><img src="img/parties/${partyIcons[p]}" alt=""></span>`
     : `<span class="avatar" style="background:${fill}" aria-hidden="true"><span class="ini">${p}</span></span>`;
   const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+  // AP style: a name ending in "s" takes only the apostrophe ("Texas' 13th district", "Ohio's")
+  const possessive = name => (name.endsWith("s") ? `${name}'` : `${name}'s`);
   function districtName(id, short = false) {
     const n = +id.slice(3), st = data.states[id.slice(0, 2)].name;
     if (short) return n ? ordinal(n) : "At large";
-    return n ? `${st}'s ${ordinal(n)} district` : `${st} at large`;
+    return n ? `${possessive(st)} ${ordinal(n)} district` : `${st} at large`;
   }
   // a year's House races: the live file for 2026, house.json for 2020-2024
   function houseRaces(y) { return (+y === LIVE_YEAR ? liveFile("house")?.races : extra.house?.races[String(y)]) || {}; }
@@ -976,7 +1064,7 @@
           extraLine = flipLine(r);
           if (r.rounds.length > 1) extraLine += `<span class="hint">${roundOf(r).label}</span>`;
         }
-        if (!SINGLE.has(st)) hint = `<span class="hint">Click to see ${sname}'s counties</span>`;
+        if (!SINGLE.has(st)) hint = `<span class="hint">Click to see ${possessive(sname)} counties</span>`;
       } else {
         hoverPath.attr("d", null);
         label = `${data.counties[f.properties.id]?.name ?? "Unknown"}, ${data.states[st].abbr}`;
@@ -1007,7 +1095,7 @@
           label = `${sname} <span class="ev">${ds.length} districts</span>`;
           body = live && !shown.length ? `<span class="tip-note">No votes counted yet</span>`
             : `<span class="tip-note">${live ? "Leading: " : ""}${["D", "R", "I"].filter(c => won[c]).map(c => `${CAUCUS_NAME[c]} ${won[c]}`).join(", ")}</span>`;
-          hint = `<span class="hint">Click to see ${sname}'s districts</span>`;
+          hint = `<span class="hint">Click to see ${possessive(sname)} districts</span>`;
         }
       } else {
         hoverPath.attr("d", null);
@@ -1025,6 +1113,16 @@
   function flipNote(unknown, any, what, why) {
     if (!unknown || !any) return "";
     return `<span class="legend-note">* Leaves out ${unknown} ${unknown === 1 ? what.replace(/s$/, "") : what} with no earlier result to compare${why ? ` (${why})` : ""}.</span>`;
+  }
+  // House: the note under the legend names the redrawn states, where the previous holder is
+  // the incumbent or else the last winner of the district number, and new seats with no holder
+  function houseNote(y) {
+    const prevY = +y - 2;
+    if (!extra.house?.races[String(prevY)]) return "";
+    const sts = Object.keys(extra.plans?.[String(y)] || {}).filter(st => redrawn(st, y)).map(st => data.states[st].abbr).sort();
+    if (!sts.length) return "";
+    const fresh = Object.entries(houseRaces(y)).filter(([, r]) => isNewSeat(r)).map(([id]) => `${data.states[id.slice(0, 2)].abbr}-${+id.slice(3)}`);
+    return `<span class="legend-note">* Redrawn since ${prevY} (${sts.length <= 12 ? sts.join(", ") : `${sts.length} states`}): against the incumbent, or else the last winner of the district number.${fresh.length ? ` New seats with no incumbent have no earlier holder: ${fresh.join(", ")}.` : ""}</span>`;
   }
   function drawCongressLegend() {
     const el = document.getElementById("legend");
@@ -1048,9 +1146,8 @@
       const items = [key([colors.demSolid, colors.gopSolid].concat(ind ? [colors.indSolid] : []), "Won", live ? "Called by a news organization" : "")];
       if (live) items.push(key([colors.dem[1], colors.gop[1]].concat(ind ? [colors.ind[1]] : []), "Leading", "Not called yet: ahead in the votes counted so far"));
       const flipped = shown.some(r => live ? pickup(r) : r.held && r.held !== r.cands[0].caucus);
-      const star = flipNote(shown.filter(r => !heldOf(r)).length, shown.some(r => heldOf(r)),
-        house ? "districts" : state.office === "governor" ? "races" : "seats",
-        house ? (live ? "new maps since 2024" : `new map since ${state.year - 2}`) : "");
+      const star = house ? houseNote(state.year)
+        : flipNote(shown.filter(r => !heldOf(r)).length, shown.some(r => heldOf(r)), state.office === "governor" ? "races" : "seats", "");
       if (flipped) items.push(key(["url(#flip-dem)", "url(#flip-gop)"], `${live ? "Pickup" : "Flipped"}${star ? "*" : ""}`,
         live ? "Called, and the seat changes party" : "The seat changed party"));
       el.innerHTML = items.join("") + pending + noRace + (flipped ? star : "");
@@ -1092,12 +1189,31 @@
   // ---------- Senate and House panel ----------
   // Official portrait for anyone who has served in Congress (img/congress/<Congress ID>.jpg),
   // else initials in the party color
+  // Commons photo credits: the license deed linked (Creative Commons asks for it); shown in the
+  // footer only for the photos on screen, and as hover text on each portrait
+  function licenseLink(lic) {
+    const m = lic.match(/^CC (BY(?:-SA)?) ([\d.]+)$/i);
+    return /^public domain$/i.test(lic) ? "public domain"
+      : m ? `<a href="https://creativecommons.org/licenses/${m[1].toLowerCase()}/${m[2]}/">${lic}</a>`
+      : /^CC0/i.test(lic) ? `<a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>` : lic;
+  }
+  function drawPhotoCredits() {
+    const el = document.getElementById("photo-credits");
+    const keys = [...new Set([...document.querySelectorAll("[data-photo]")].map(n => n.dataset.photo))].filter(k => peoplePhotos[k]);
+    el.hidden = !keys.length;
+    el.innerHTML = keys.length ? "Candidate photos from Wikimedia Commons: " + keys.map(k => {
+      const c = peoplePhotos[k];
+      return `<a href="${c.page}">${c.name}</a> by ${c.author} (${licenseLink(c.license)})`;
+    }).join("; ") + "." : "";
+  }
   function initialsAvatar(c, fill) {
     const parts = c.name.replace(/[^A-Za-zÀ-ž\s-]/g, "").trim().split(/\s+/);
     const ini = ((parts[0] || "")[0] || "") + ((parts[parts.length - 1] || "")[0] || "");
+    const pp = !congressPhotos.has(c.bio) && peoplePhotos[c.photo];
     const img = congressPhotos.has(c.bio) ? `<img src="img/congress/${c.bio}.jpg" alt="" loading="lazy">`
-      : peoplePhotos[c.photo] ? `<img src="img/people/${c.photo}.jpg" alt="" loading="lazy">` : "";
-    return `<span class="avatar" style="background:${fill}" aria-hidden="true"><span class="ini">${ini.toUpperCase()}</span>${img}</span>`;
+      : pp ? `<img src="img/people/${c.photo}.jpg" alt="" loading="lazy">` : "";
+    const credit = pp ? ` data-photo="${c.photo}" title="${attr(`Photo: ${pp.author}, ${/^public domain$/i.test(pp.license) ? "public domain" : pp.license}`)}"` : "";
+    return `<span class="avatar" style="background:${fill}" aria-hidden="true"${credit}><span class="ini">${ini.toUpperCase()}</span>${img}</span>`;
   }
   function personRow(c, votes, total, winner, lead = 0) {
     const fill = candFill(c);
@@ -1136,13 +1252,14 @@
   function raceBody(r) {
     if (!r.rounds.length) {
       return `<div class="cand">${personRow(r.cands[0], null, null, true)}</div>
-        <p class="note">Won unopposed</p>${notesList(r.notes)}`;
+        <p class="note">Won unopposed${isNewSeat(r) ? " · New seat" : ""}</p>${notesList(r.notes)}`;
     }
     const last = r.rounds.length - 1;
     const ri = state.round != null && state.round <= last ? state.round : last;
     const rd = r.rounds[ri], l = lean(r.cands, rd.votes, rd.total);
     // grey lines, as tonight: what the numbers are, and whether the seat changed party
     const facts = [rd.label, `${fmtInt(rd.total)} votes`];
+    if (isNewSeat(r)) facts.push("New seat");
     if (ri !== last) facts.push(`decided in the ${r.rounds[last].kind === "runoff" ? "runoff" : "final round"}`);
     const w = r.cands[0].caucus;
     const flip = r.held && r.held !== w
@@ -1171,13 +1288,17 @@
     const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
     for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
       lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
-    return `${tugBar(t, 100, senateNeed(SENATE_VP[y]), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>`;
+    const items = [...rs].sort((a, b) => data.states[a.st].abbr.localeCompare(data.states[b.st].abbr) || SEAT_ORDER[a.seat] - SEAT_ORDER[b.seat])
+      .map(r => ({ m: signedMargin(raceLean(r)), html: raceRow(`data-race-st="${r.st}" data-race-seat="${r.seat}"`, `${data.states[r.st].abbr}${r.seat === "special" ? " sp." : ""}`,
+        personCell(r.cands[0]), "", leanLabel(raceLean(r))) }));
+    return `${tugBar(t, 100, senateNeed(SENATE_VP[y]), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>
+      ${raceList("Races", items)}`;
   }
   function houseSeatsBody(y) {
     const c = extra.house.seats[y];
     const t = {};
     for (const p of ["D", "R"]) t[p] = { solid: c[p], lead: 0, lines: [`${c[p]} won`] };
-    return `${tugBar(t, 435, "218 for a majority", houseGains(y), "districts", "", c.D >= 218 ? "D" : c.R >= 218 ? "R" : null)}${popSection(extra.house.popular[y])}`;
+    return `${tugBar(t, 435, "218 for a majority", houseNet(y), "districts", "", c.D >= 218 ? "D" : c.R >= 218 ? "R" : null)}${popSection(extra.house.popular[y])}`;
   }
   // House popular vote: [Democratic, Republican, all] votes over the races given (first round,
   // as counted so far tonight); unopposed races not on the ballot add nothing
@@ -1217,11 +1338,71 @@
     }
     return g;
   }
-  // a House district changed party when the same district (the state kept its map) went the other way
-  function houseGains(y, only = null) {
-    if (!extra.house.races[String(+y - 2)]) return pastGains([]);
-    return pastGains(Object.entries(extra.house.races[y]).filter(([id]) => !only || id.startsWith(only + "-"))
-      .map(([, r]) => [r.held, r.cands[0].caucus]), `new map since ${+y - 2}`);
+  // House: one net number per party, for the country or one state (st). Once every race is
+  // decided (past years; tonight when all are called): seats won now minus seats won last time.
+  // While counting: called races against each seat's previous holder (the map's pickups).
+  function houseNet(y, st = null) {
+    const prevY = +y - 2, mine = id => !st || id.startsWith(st + "-");
+    const before = extra.house?.races[String(prevY)];
+    if (!before) return null;
+    const live = +y === LIVE_YEAR;
+    const now = Object.entries(houseRaces(y)).filter(([id]) => mine(id)).map(([, r]) => r);
+    const winner = r => (live ? (r.call && r.call.winner != null ? r.cands[r.call.winner].caucus : null) : r.cands[0]?.caucus);
+    const net = { D: 0, R: 0, I: 0 };
+    const called = now.filter(winner).length;
+    const done = now.length > 0 && called === now.length;
+    if (done) {
+      for (const r of now) net[winner(r)]++;
+      for (const [id, r] of Object.entries(before)) if (mine(id)) net[r.cands[0].caucus]--;
+    } else {
+      for (const r of now) {
+        const w = winner(r), h = live ? heldBy(r) : r.holder;
+        if (w && h?.caucus && h.caucus !== w) { net[w]++; net[h.caucus]--; }
+      }
+    }
+    return { net, title: done ? `Seats won in ${y} minus seats won in ${prevY}`
+      : `Net from the ${called} of ${now.length} races called so far, against each seat's previous holder; final once all are called` };
+  }
+  // One row of a race list, the same columns everywhere: label | name (shortens to fit) |
+  // status (✓ called, or the share counted while leading; empty for past years) | margin.
+  // attrs: the button's data attributes; null for a row that is not a link
+  function raceRow(attrs, what, who, status, lean) {
+    const inner = `<span class="what">${what}</span><span class="who">${who}</span><span class="status">${status}</span>${lean}`;
+    return attrs == null ? `<li><div class="prev-row">${inner}</div></li>` : `<li><button type="button" ${attrs}>${inner}</button></li>`;
+  }
+  const personCell = c => `${fitName(c)}${partyTag(c)}`;
+  // a district's label in a list, marked when it is a new seat with no earlier holder
+  const districtLabel = (id, r) => `${districtName(id, true)}${isNewSeat(r) ? ` <span class="new" title="New seat: no earlier holder">new</span>` : ""}`;
+  // tonight: who is shown (the called winner, else the leader) and the status column
+  function liveRowParts(r) {
+    const l = counted(r) ? raceLean(r) : null, called = r.call && r.call.winner != null;
+    const who = called ? personCell(r.cands[r.call.winner]) : l ? personCell(r.cands[l.lead]) : `<span class="muted">${liveStatus(r)}</span>`;
+    const status = called ? `<span class="won">${CHECK}<span class="sr">won</span></span>`
+      : l ? `<span class="muted">${pctText(r).replace(/ of .*| counted/, "")}</span>` : "";
+    return { who, status, lean: l ? leanLabel(l) : "" };
+  }
+  // Order of race lists, remembered per browser: A–Z (by state, or by district number),
+  // Closest (smallest margin first) or D → R (biggest Democratic margin to biggest Republican)
+  let raceSort = "az";
+  try { raceSort = localStorage.getItem("raceSort") || "az"; } catch (e) { /* private mode: default order */ }
+  const signedMargin = l => (!l ? null : l.caucus === "D" ? l.m : l.caucus === "R" ? -l.m : 0);
+  // tonight: counted races first (in the chosen order), then closed polls with no votes yet,
+  // then open polls by closing time; within a closing time, A–Z
+  const liveGroup = r => (counted(r) ? 0 : !r.polls_close || isClosed(r) ? 1 : 2);
+  // items: { html, m (signed margin or null), group, close } given in A–Z order
+  function raceList(title, items, firstLabel = "A–Z") {
+    const by = {
+      az: () => 0,
+      close: (a, b) => Math.abs(a.m) - Math.abs(b.m),
+      spectrum: (a, b) => b.m - a.m,
+    }[raceSort] || (() => 0);
+    const grp = x => (x.m == null ? Math.max(1, x.group ?? 1) : x.group ?? 0);
+    const sorted = items.map((x, i) => ({ ...x, i })).sort((a, b) => grp(a) - grp(b)
+      || (grp(a) === 0 ? by(a, b) : grp(a) === 2 ? Date.parse(a.close) - Date.parse(b.close) : 0) || a.i - b.i);
+    const opts = [["az", firstLabel], ["close", "Closest"], ["spectrum", "D → R"]];
+    const sw = `<div class="mode sort" role="radiogroup" aria-label="Order">${opts.map(([k, label]) =>
+      `<button type="button" role="radio" aria-checked="${k === raceSort}" data-sort="${k}">${label}</button>`).join("")}</div>`;
+    return `<section data-races><div class="races-head"><h3>${title}</h3>${sw}</div><ul class="race-list">${sorted.map(x => x.html).join("")}</ul></section>`;
   }
   function senateHistory(st) {
     const items = [];
@@ -1229,8 +1410,8 @@
       for (const r of senateRaces(st, y)) {
         const l = raceLean(r), w = r.cands[0];
         const cur = y === state.year && (stateOf(state.sel) !== st || r.seat === state.seat || senateRaces(st, y).length === 1);
-        items.push(`<li><button type="button" data-year="${y}" data-seat="${r.seat}"${cur ? ' aria-current="true"' : ""}>
-          <span class="what">${y}${r.seat === "special" ? " sp." : ""}</span><span class="who">${w.name}${partyTag(w)}</span>${leanLabel(l)}</button></li>`);
+        items.push(raceRow(`data-year="${y}" data-seat="${r.seat}"${cur ? ' aria-current="true"' : ""}`,
+          `${y}${r.seat === "special" ? " sp." : ""}`, personCell(w), "", leanLabel(l)));
       }
     }
     return items.length
@@ -1244,9 +1425,8 @@
     // the same bar as the country view: seats won in this state's delegation, and seats that changed party
     const t = {};
     for (const p of ["D", "R", "I"]) t[p] = { solid: won[p], lead: 0, lines: [`${won[p]} won`] };
-    const items = races.map(([id, r]) => `<li><button type="button" data-dist="${id}"><span class="what">${districtName(id, true)}</span>
-      <span class="who">${r.cands[0].name}${partyTag(r.cands[0])}</span>${leanLabel(raceLean(r))}</button></li>`);
-    return `${tugBar(t, races.length, "", houseGains(String(state.year), st), "districts")}${popSection(houseVotes(races.map(([, r]) => r)))}<section data-races><h3>Districts</h3><ul class="race-list">${items.join("")}</ul></section>`;
+    const items = races.map(([id, r]) => ({ m: signedMargin(raceLean(r)), html: raceRow(`data-dist="${id}"`, districtLabel(id, r), personCell(r.cands[0]), "", leanLabel(raceLean(r))) }));
+    return `${tugBar(t, races.length, "", houseNet(state.year, st), "districts")}${popSection(houseVotes(races.map(([, r]) => r)))}${raceList("Districts", items, "1st–")}`;
   }
 
   function drawCongressPanel() {
@@ -1298,17 +1478,24 @@
   const clock = iso => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
   const isClosed = r => Date.now() >= Date.parse(r.polls_close);
   const counted = r => !!(r.rounds && r.rounds.length && r.rounds[0].total);
-  // who held the seat: the winner of the last election for it (r.prev; Senate seats, and House
-  // districts whose map did not change); a called race won by the other side is a pickup
+  // who held the seat: Senate and governor races, the winner of the last election for it (r.prev);
+  // House districts, the rule in houseHolder(). A called race won by the other side is a pickup
+  const isHouseRace = r => /^\d\d-\d\d$/.test(r.id || "");
   function heldBy(r) {
+    if (isHouseRace(r)) {
+      if (r.holder === undefined && extra.house) r.holder = houseHolder(r.id, r.cands, LIVE_YEAR);
+      return r.holder?.caucus ? r.holder : null;
+    }
     const p = r.prev;
     if (!p || !p.cands || !p.cands.length) return null;
-    return p.cands.reduce((a, b) => (b.votes > a.votes ? b : a));
+    const w = p.cands.reduce((a, b) => (b.votes > a.votes ? b : a));
+    return { caucus: w.caucus, name: w.name, year: p.year };
   }
+  const isNewSeat = r => !!(isHouseRace(r) ? (heldBy(r), r.holder) : r.holder)?.newSeat;
   function pickup(r) {
     if (!r || !r.call || r.call.winner == null) return null;
     const held = heldBy(r), won = r.cands[r.call.winner];
-    return held && held.caucus !== won.caucus ? { won, held, year: r.prev.year } : null;
+    return held && held.caucus !== won.caucus ? { won, held } : null;
   }
   function liveFill(r) {
     if (!r) return colors.nodata;
@@ -1361,30 +1548,32 @@
   const PARTY_ADJ = { D: "Democratic", R: "Republican", I: "Independent" };
   function pickupText(r) {
     const k = pickup(r);
-    return k ? `<p class="note"><strong>${PARTY_ADJ[k.won.caucus][0].toUpperCase() + PARTY_ADJ[k.won.caucus].slice(1)} pickup</strong> · ${CAUCUS_NAME[k.held.caucus]} held this seat (${k.held.name}, ${k.year})</p>` : "";
+    if (!k) return "";
+    const h = k.held, when = h.how === "incumbent" ? "incumbent" : h.how === "number" ? `${h.year}, before the new map` : h.year;
+    return `<p class="note"><strong>${PARTY_ADJ[k.won.caucus]} pickup</strong> · ${CAUCUS_NAME[h.caucus]} held this seat (${h.name}, ${when})</p>`;
   }
   function livePrev(r) {
     const p = r.prev;
     if (!p) return "";
     const order = p.cands.map((c, i) => i).sort((a, b) => p.cands[b].votes - p.cands[a].votes);
     const w = p.cands[order[0]], l = lean(p.cands, p.cands.map(c => c.votes), p.total);
-    const row = `<span class="what">${p.year}${p.seat === "special" ? " sp." : ""}</span><span class="who">${w.name}${partyTag(w)}</span>${leanLabel(l)}`;
+    const what = `${p.year}${p.seat === "special" ? " sp." : ""}`;
     // governor history has no page of its own yet, so its row is not a link
     return r.office === "governor"
-      ? `<h3>Last time</h3><ul class="race-list"><li><div class="prev-row">${row}</div></li></ul><p class="note">${p.year} result: MIT Election Data and Science Lab, precinct returns summed to the state.</p>`
-      : `<h3>Last time for this seat</h3><ul class="race-list"><li><button type="button" data-prev-year="${p.year}" data-prev-seat="${p.seat}">${row}</button></li></ul>`;
+      ? `<h3>Last time</h3><ul class="race-list">${raceRow(null, what, personCell(w), "", leanLabel(l))}</ul><p class="note">${p.year} result: MIT Election Data and Science Lab, precinct returns summed to the state.</p>`
+      : `<h3>Last time for this seat</h3><ul class="race-list">${raceRow(`data-prev-year="${p.year}" data-prev-seat="${p.seat}"`, what, personCell(w), "", leanLabel(l))}</ul>`;
   }
   function liveRaceBody(r, id = r.id) {
     let html = r.test ? `<p class="test-flag">Test data, not real results</p>` : "";
     if (!counted(r)) {
       const called = r.call && r.call.winner != null;
       html += `<div class="cand">${r.cands.map((c, i) => personRow(c, 0, 0, called && i === r.call.winner)).join("")}</div>
-        <p class="note">${called ? `Called by ${r.call.by}` : liveStatus(r)}</p>${called ? pickupText(r) : ""}`;
+        <p class="note">${[called ? `Called by ${r.call.by}` : liveStatus(r), isNewSeat(r) ? "New seat" : ""].filter(Boolean).join(" · ")}</p>${called ? pickupText(r) : ""}`;
     } else {
       const rd = roundOf(r), l = raceLean(r), called = r.call && r.call.winner != null;
       html += `<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, called ? 0 : -1)}</div>`;
       // the bars say who won or leads; the grey lines say who called it and how much is counted
-      const facts = [called ? `Called by ${r.call.by}` : "", `${fmtInt(rd.total)} votes counted${pctShort(r)}`].filter(Boolean);
+      const facts = [called ? `Called by ${r.call.by}` : "", `${fmtInt(rd.total)} votes counted${pctShort(r)}`, isNewSeat(r) ? "New seat" : ""].filter(Boolean);
       html += `<p class="note">${facts.join(" · ")}</p>${called ? pickupText(r) : ""}`;
       // the source sits with the numbers it gave, above the chart
       html += liveSource(r) + `<div class="trail" data-trail="${id}"></div>`;
@@ -1426,9 +1615,16 @@
     // the "leading" line under it
     const num = p => `<span class="tug-num"><b title="${t[p].solidText || "Won"}">${t[p].solid}</b></span>`;
     const g = Array.isArray(races) ? gains(races) : races;
+    const EVEN = `<span class="even">= 0</span>`; // no change: in the text color, not green or red
+    // House: one net number per party (houseNet); Senate and governors: gained and lost
+    const netSide = p => {
+      const n = g.net[p];
+      return `<ul class="tug-lines tug-gains-side ${p === "D" ? "dem" : "gop"}"><li title="${g.title}">${n > 0 ? `<span class="gain">▲ ${n}</span>` : n < 0 ? `<span class="loss">▼ ${-n}</span>` : EVEN}</li></ul>`;
+    };
     const arrows = p => {
       // called races only; leads in the other party's seats go in the hover text
       const lead = k => (k ? ` Not yet called: ahead in ${k} more.` : "");
+      if (!g.won[p] && !g.lost[p]) return `<li title="No ${what} changed party.${lead(g.lead[p])}${lead(g.leadLost[p]).replace("ahead", "behind")}">${EVEN}</li>`;
       return `<li class="up" title="Won ${g.won[p]} ${what} the other party held before.${lead(g.lead[p])}"><span class="gain">▲ ${g.won[p]}</span></li>
         <li class="down" title="Lost ${g.lost[p]} ${what} this party held before.${lead(g.leadLost[p]).replace("ahead", "behind")}"><span class="loss">▼ ${g.lost[p]}</span></li>`;
     };
@@ -1443,8 +1639,8 @@
     const gainSide = p => `<ul class="tug-lines tug-gains-side ${p === "D" ? "dem" : "gop"}">${arrows(p)}</ul>`;
     const other = n("I") ? `<p class="tug-other">${CAUCUS_NAME.I}: ${n("I")} (${t.I.lines.join(", ")})</p>` : "";
     return `<div class="tug">
-      <div class="tug-head"><span class="dem">${partyAvatar("D", colors.demSolid)}<span class="tug-who">${num("D")}<span class="pname${control === "D" ? " has-control" : ""}" data-short="${SHORT_NAME.D}" data-full="${CAUCUS_NAME.D}"${control === "D" ? ' title="Majority"' : ""}>${CAUCUS_NAME.D}</span></span></span><span class="gop"><span class="tug-who">${num("R")}<span class="pname${control === "R" ? " has-control" : ""}" data-short="${SHORT_NAME.R}" data-full="${CAUCUS_NAME.R}"${control === "R" ? ' title="Majority"' : ""}>${CAUCUS_NAME.R}</span></span>${partyAvatar("R", colors.gopSolid)}</span></div>
-      ${g.any ? `<div class="tug-foot tug-gains">${gainSide("D")}${gainSide("R")}</div>` : ""}
+      <div class="tug-head"><span class="dem">${partyAvatar("D", colors.demSolid)}<span class="tug-who">${num("D")}<span class="pname${control === "D" ? " has-control" : ""}" data-forms="${CAUCUS_NAME.D}|${SHORT_NAME.D}"${control === "D" ? ' data-title="Majority" title="Majority"' : ""}>${CAUCUS_NAME.D}</span></span></span><span class="gop"><span class="tug-who">${num("R")}<span class="pname${control === "R" ? " has-control" : ""}" data-forms="${CAUCUS_NAME.R}|${SHORT_NAME.R}"${control === "R" ? ' data-title="Majority" title="Majority"' : ""}>${CAUCUS_NAME.R}</span></span>${partyAvatar("R", colors.gopSolid)}</span></div>
+      ${g?.net ? `<div class="tug-foot tug-gains">${netSide("D")}${netSide("R")}</div>` : g?.any ? `<div class="tug-foot tug-gains">${gainSide("D")}${gainSide("R")}</div>` : ""}
       <div class="bar ev-bar tug-bar" style="--need:0.5">${ds}${dl}${is_}${il}<i class="gap"></i>${rl}${rs}${needText != null ? `<i class="need" title="${needText || "Half the seats"}"></i>` : ""}</div>
       ${needText ? `<p class="tug-need">${needText}</p>` : ""}
       ${needLines ? lineRows : ""}${under}${other}</div>`;
@@ -1485,18 +1681,16 @@
     return tugBar(t, rs.length, null, rs, "seats");
   }
   function liveNationBody() {
-    const rs = [...sYear()].sort((a, b) => Date.parse(a.polls_close) - Date.parse(b.polls_close) || data.states[a.st].name.localeCompare(data.states[b.st].name));
+    const rs = [...sYear()].sort((a, b) => data.states[a.st].abbr.localeCompare(data.states[b.st].abbr) || SEAT_ORDER[a.seat] - SEAT_ORDER[b.seat]);
     if (!rs.length) return `<p class="empty">No results file yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
     const items = rs.map(r => {
-      const l = counted(r) ? raceLean(r) : null;
-      const who = r.call && r.call.winner != null ? `${r.cands[r.call.winner].name}${partyTag(r.cands[r.call.winner])} <span class="won">${CHECK}</span>`
-        : l ? `${r.cands[l.lead].last}${partyTag(r.cands[l.lead])}` : `<span class="muted">${liveStatus(r)}</span>`;
-      return `<li><button type="button" data-live-st="${r.st}" data-live-seat="${r.seat}"><span class="what">${data.states[r.st].abbr} ${r.seat === "governor" ? "Gov." : r.seat === "special" ? "Sen. sp." : "Sen."}</span>
-        <span class="who">${who}${l && !(r.call && r.call.winner != null) ? ` <span class="muted">· ${pctText(r).replace(/ of .*| counted/, "")}</span>` : ""}</span>${l ? leanLabel(l) : ""}</button></li>`;
+      const x = liveRowParts(r);
+      return { m: counted(r) ? signedMargin(raceLean(r)) : null, group: liveGroup(r), close: r.polls_close,
+        html: raceRow(`data-race-st="${r.st}" data-race-seat="${r.seat}"`, `${data.states[r.st].abbr}${r.seat === "special" ? " sp." : ""}`, x.who, x.status, x.lean) };
     });
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
     return `${test}${state.office === "senate" ? senateBalanceBody() : governorTallyBody(rs)}
-      <section data-races><h3>Races</h3><ul class="race-list">${items.join("")}</ul></section>`;
+      ${raceList("Races", items)}`;
   }
   // footer: name the official sources the live results come from right now
   function drawLiveSources() {
@@ -1532,19 +1726,11 @@
       drawPanel();
       writeHash();
     }));
-    panel.querySelectorAll("[data-live-st]").forEach(b => b.addEventListener("click", () => {
-      select({ type: "state", id: b.dataset.liveSt }, true);
-      state.seat = b.dataset.liveSeat;
-      drawMap();
-      drawPanel();
-      writeHash();
-    }));
     panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => {
       state.seat = b.dataset.prevSeat;
       setYear(+b.dataset.prevYear);
     }));
     fillTrail();
-    fitPartyNames();
   }
   // ---------- the race through the night (web/data/live/trail-<office>.json) ----------
   // Loaded only when a race panel is open, and again only when the office file says the chart
@@ -1647,7 +1833,7 @@
     trailInfo = { pts, x, y, M, w, ca, cb, srcs: tr.srcs };
     const last2 = (s, c) => `<tspan fill="${candFill(c)}" font-weight="700">${c.last || c.name}</tspan>${s}`;
     return `<h3>Through the night</h3>
-      <svg class="history trail-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${ca.name}'s lead over ${cb.name} as the votes were counted">
+      <svg class="history trail-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="${possessive(ca.name)} lead over ${cb.name} as the votes were counted">
         <defs><clipPath id="${cid}-up"><rect x="0" y="${top}" width="${w}" height="${y(0) - top}"/></clipPath>
           <clipPath id="${cid}-dn"><rect x="0" y="${y(0)}" width="${w}" height="${h - bottom - y(0)}"/></clipPath>
           <clipPath id="${cid}-in"><rect x="0" y="${top}" width="${w}" height="${h - bottom - top}"/></clipPath></defs>
@@ -1684,7 +1870,7 @@
     const x = liveHouseTally(rs), t = {};
     for (const p of ["D", "R"]) t[p] = { solid: x.won[p], lead: x[p] - x.won[p], lines: [`${x.won[p]} won`, `${x[p] - x.won[p]} leading`] };
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
-    return `${test}${tugBar(t, 435, "218 for a majority", rs, "districts", "", t.D.solid >= 218 ? "D" : t.R.solid >= 218 ? "R" : null)}${popSection(houseVotes(rs), true)}
+    return `${test}${tugBar(t, 435, "218 for a majority", houseNet(LIVE_YEAR), "districts", "", t.D.solid >= 218 ? "D" : t.R.solid >= 218 ? "R" : null)}${popSection(houseVotes(rs), true)}
 `;
   }
   function drawLiveHousePanel() {
@@ -1699,23 +1885,20 @@
       const ds = Object.entries(races).filter(([id]) => id.startsWith(st + "-")).sort();
       const t = liveHouseTally(ds.map(([, r]) => r));
       const items = ds.map(([id, r]) => {
-        const l = counted(r) ? raceLean(r) : null, won = r.call && r.call.winner != null ? r.cands[r.call.winner] : null;
-        const who = won ? `${won.name}${partyTag(won)} <span class="won">${CHECK}<span class="sr">won</span></span>`
-          : l ? `${r.cands[l.lead].name}${partyTag(r.cands[l.lead])}` : `<span class="muted">${liveStatus(r)}</span>`;
-        return `<li><button type="button" data-dist="${id}"><span class="what">${districtName(id, true)}</span>
-          <span class="who">${who}</span>${l ? leanLabel(l) : ""}</button></li>`;
+        const x = liveRowParts(r);
+        return { m: counted(r) ? signedMargin(raceLean(r)) : null, group: liveGroup(r), close: r.polls_close,
+          html: raceRow(`data-dist="${id}"`, districtLabel(id, r), x.who, x.status, x.lean) };
       });
       const tt = {};
       for (const p of ["D", "R", "I"]) tt[p] = { solid: t.won[p], lead: t[p] - t.won[p], lines: [`${t.won[p]} won`, `${t[p] - t.won[p]} leading`] };
       html = `${headline("house", { type: "state", id: st }, `${liveWhen()} · ${ds.length} districts`)}
-        ${tugBar(tt, ds.length, "", ds.map(([, r]) => r), "districts")}${t.none ? `<p class="tug-other">${t.none} with no votes counted yet.</p>` : ""}${popSection(houseVotes(ds.map(([, r]) => r)), true)}${notesList(ds[0]?.[1].notes)}
-        <section data-races><h3>Districts</h3><ul class="race-list">${items.join("")}</ul></section>`;
+        ${tugBar(tt, ds.length, "", houseNet(LIVE_YEAR, st), "districts")}${t.none ? `<p class="tug-other">${t.none} with no votes counted yet.</p>` : ""}${popSection(houseVotes(ds.map(([, r]) => r)), true)}${notesList(ds[0]?.[1].notes)}
+        ${raceList("Districts", items, "1st–")}`;
     }
     panel.innerHTML = html;
     panel.querySelectorAll("[data-dist]").forEach(b => b.addEventListener("click", () => select({ type: "district", id: b.dataset.dist }, true)));
     panel.querySelectorAll("[data-prev-year]").forEach(b => b.addEventListener("click", () => setYear(+b.dataset.prevYear)));
     fillTrail();
-    fitPartyNames();
   }
 
   // re-read the results file every 30 seconds; redraw only when it changed
@@ -1887,20 +2070,6 @@
     arrowsBtn.hidden = !pres || state.mode !== "shift";
     // footer: only the sources of what is on screen (plus the lines every view needs)
     const view = isLive() ? "live" : state.office;
-    const credits = document.getElementById("photo-credits");
-    if (credits && !credits.dataset.filled) {
-      const keys = Object.keys(peoplePhotos);
-      credits.dataset.filled = "1";
-      credits.innerHTML = keys.length ? "Candidate photos from Wikimedia Commons: " + keys.map(k => {
-        const c = peoplePhotos[k];
-        // link the license deed: Creative Commons asks for it
-        const m = c.license.match(/^CC (BY(?:-SA)?) ([\d.]+)$/i);
-        const lic = /^public domain$/i.test(c.license) ? "public domain"
-          : m ? `<a href="https://creativecommons.org/licenses/${m[1].toLowerCase()}/${m[2]}/">${c.license}</a>`
-          : /^CC0/i.test(c.license) ? `<a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>` : c.license;
-        return `<a href="${c.page}">${c.name}</a> by ${c.author} (${lic})`;
-      }).join("; ") + "." : "";
-    }
     document.querySelectorAll(".colophon [data-src]").forEach(el => { el.hidden = !el.dataset.src.split(" ").includes(view); });
     arrowsBtn.setAttribute("aria-pressed", String(state.arrows));
   }
@@ -1948,7 +2117,7 @@
       h.innerHTML = `How America voted for the House, <span class="nowrap">2020 to 2024</span>`;
       dek.textContent = "All 435 seats in 2020, 2022 and 2024, district by district.";
     } else {
-      h.innerHTML = `Election night, <span class="nowrap">3 November 2026</span>`;
+      h.innerHTML = `Election night, <span class="nowrap">November 3, 2026</span>`;
       dek.textContent = (state.office === "governor" ? "36 states elect a governor."
         : state.office === "house" ? "All 435 seats, on this year's district maps (nine states drew new ones)."
         : "35 Senate seats are on the ballot, including special elections in Florida and Ohio.")

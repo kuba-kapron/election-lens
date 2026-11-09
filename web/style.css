@@ -556,20 +556,37 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .races {
   /* same width as the stage above (1320px less its 24px sides) */
   margin: 0 max(24px, calc((100% - 1272px) / 2)) 24px;
-  padding: 4px 20px 16px;
 }
+/* the card's padding is its top space: no extra margin on its heading */
+.races > :first-child { margin-top: 0; }
+/* the list's title with its order switch (A–Z | Closest | D → R) on the right */
+.races-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 8px; }
+.races-head h3 { margin: 0; }
 .races .race-list { columns: 260px 4; column-gap: 32px; }
 .races .race-list li { break-inside: avoid; }
 
 /* Lists of races (a state's districts, a state's Senate races, tonight's races) */
 .race-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .race-list li { border-top: 1px solid var(--rule); }
-.race-list button { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 8px; width: 100%;
+.race-list button { display: grid; grid-template-columns: var(--race-cols); gap: 8px; width: 100%;
   text-align: left; background: none; border: 0; padding: 6px 0; }
 .race-list button:hover .who { text-decoration: underline; }
 .race-list .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .race-list .what { color: var(--muted); }
-.race-list .prev-row { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 8px; padding: 6px 0; }
+/* columns: label | name | status (✓ for a called race, else the share counted) | margin. Status
+   and margin have fixed widths so checkmarks line up down the list; lists without any status
+   (past years) leave that column out */
+.race-list { --what: 4.5em; --race-cols: var(--what) minmax(0, 1fr) 2.6em minmax(4.2em, auto); }
+.race-list:not(:has(.status:not(:empty))) { --race-cols: var(--what) minmax(0, 1fr) minmax(4.2em, auto); }
+/* a list with a new seat ("38th new") gets a wider label column */
+.race-list:has(.what .new) { --what: 6.4em; }
+.race-list .what .new { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.race-list:not(:has(.status:not(:empty))) .status { display: none; }
+.race-list .status { white-space: nowrap; text-align: center; }
+.race-list .mg { text-align: right; }
+/* race lists are tight: the party letter only, no icon */
+.race-list .party-tag img { display: none; }
+.race-list .prev-row { display: grid; grid-template-columns: var(--race-cols); gap: 8px; padding: 6px 0; }
 .seat-bar .need { left: calc(var(--need) * 100%); }
 
 /* One bar per office: Democrats from the left, Republicans from the right */
@@ -612,6 +629,7 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
 .tug-gains-side, .state-gains { font-variant-numeric: tabular-nums; }
 .gain { color: var(--gain); font-weight: 600; }
 .loss { color: var(--loss); font-weight: 600; }
+.even { color: var(--ink); font-weight: 600; }
 .tug-gains + .tug-bar { margin-top: 6px; }
 .tug-lines .up, .tug-lines .up ~ .down { color: var(--ink); }
 .state-gains { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; display: grid; grid-template-columns: auto auto auto; justify-content: start; column-gap: 18px; row-gap: 2px; }
