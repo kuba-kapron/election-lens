@@ -192,6 +192,27 @@ def county_fill(race, reading, src, errors, args):
         reading.county_source = {"name": name, "url": url, "official": False, "fetched": iso(r.fetched)}
 
 
+def call_order(lasts, votes, call):
+    """A hand call -> (candidate order, the page's call). The winner goes first; for a runoff
+    call ("runoff": two last names, no winner yet) the two who advanced go first, by votes.
+    votes may be None (called before any numbers). Unknown names leave the race uncalled."""
+    n = len(lasts)
+    by_votes = sorted(range(n), key=lambda i: -(votes[i] if votes else 0))
+    if not call:
+        return by_votes, None
+    find = lambda name: next((i for i, l in enumerate(lasts) if l.lower() == name.lower()), None)
+    if call.get("runoff"):
+        adv = [find(x) for x in call["runoff"]]
+        if None in adv:
+            return by_votes, None
+        top = [i for i in by_votes if i in adv]
+        return top + [i for i in by_votes if i not in adv], {"winner": None, "advanced": list(range(len(top))), "by": call["by"], "at": call["at"]}
+    w = find(call["winner"])
+    if w is None:
+        return by_votes, {"winner": None, "by": call["by"], "at": call["at"]}
+    return [w] + [i for i in by_votes if i != w], {"winner": 0, "by": call["by"], "at": call["at"]}
+
+
 def build(race, reading, src, errors, manual, calls, senate):
     now = time.time()
     out = {"id": race["id"], "st": S.ABBR_TO_FIPS[race["st"]], "office": race["office"], "seat": race["seat"],
@@ -210,11 +231,11 @@ def build(race, reading, src, errors, manual, calls, senate):
         name, url, official, kind = f"Entered by hand from {m['source']}", None, False, "manual"
     if reading is None:
         out.update({"rounds": [], "counties": {}, "pct": None, "source": None, "status": "no data"})
-        call = calls.get(race["id"])
-        w = next((i for i, c in enumerate(out["cands"]) if call and c["last"] == call["winner"]), None)
-        if w is not None:  # called without numbers (e.g. Pennsylvania): still show the winner
-            out["cands"].insert(0, out["cands"].pop(w))
-            out["call"] = {"winner": 0, "by": call["by"], "at": call["at"]}
+        # called without numbers (e.g. Pennsylvania): still show the winner, or who advanced
+        order, call = call_order([c["last"] for c in out["cands"]], None, calls.get(race["id"]))
+        if call and (call["winner"] is not None or call.get("advanced")):
+            out["cands"] = [out["cands"][i] for i in order]
+            out["call"] = call
         return out
     v, other = align(race, reading.names, dict(zip(reading.names, reading.votes)), reading.total)
     counties = {}
@@ -235,16 +256,10 @@ def build(race, reading, src, errors, manual, calls, senate):
                      "fetched": iso(reading.fetched), "as_of": reading.as_of}
     out["stale"] = bool(reading.fetched) and kind != "manual" and now - reading.fetched > STALE_AFTER
     out["test"] = reading.test
-    call = calls.get(race["id"])
+    # the page lists the leader first, like the Senate history (a called winner, or who advanced, first)
+    order, call = call_order([c["last"] for c in out["cands"]], v, calls.get(race["id"]))
     if call:
-        out["call"] = {"winner": next((i for i, c in enumerate(out["cands"]) if c["last"] == call["winner"]), None),
-                       "by": call["by"], "at": call["at"]}
-    # the page lists the leader first, like the Senate history
-    order = sorted(range(len(v)), key=lambda i: -v[i])
-    if out.get("call") and out["call"]["winner"] is not None:
-        order.remove(out["call"]["winner"])
-        order.insert(0, out["call"]["winner"])
-        out["call"]["winner"] = 0
+        out["call"] = call
     out["cands"] = [out["cands"][i] for i in order]
     out["rounds"][0]["votes"] = [v[i] for i in order]
     out["counties"] = {f: [c[i] for i in order] + c[len(order):] for f, c in counties.items()}
@@ -316,15 +331,15 @@ def house_calls(races, calls):
         if not race:
             print(f"{time.strftime('%H:%M:%S')} House   call {key}: no such district in tonight's races", flush=True)
             continue
-        i = next((i for i, c in enumerate(race["cands"]) if c["last"].lower() == call["winner"].lower()), None)
-        if i is None:
-            print(f"{time.strftime('%H:%M:%S')} House   call {key}: no candidate {call['winner']!r}", flush=True)
+        rd = race["rounds"][0] if race.get("rounds") else None
+        order, page_call = call_order([c["last"] for c in race["cands"]], rd["votes"] if rd else None, call)
+        if not page_call or (page_call["winner"] is None and not page_call.get("advanced")):
+            print(f"{time.strftime('%H:%M:%S')} House   call {key}: no candidate {call.get('winner') or call.get('runoff')!r}", flush=True)
             continue
-        order = [i] + [j for j in range(len(race["cands"])) if j != i]
         race["cands"] = [race["cands"][j] for j in order]
-        rd = race["rounds"][0]
-        rd["votes"] = [rd["votes"][j] for j in order]
-        race["call"] = {"winner": 0, "by": call["by"], "at": call["at"]}
+        if rd:
+            rd["votes"] = [rd["votes"][j] for j in order]
+        race["call"] = page_call
 
 
 HOUSE_PER_ROUND = 3  # states asked per round (about 30 s each tonight), longest-waiting first

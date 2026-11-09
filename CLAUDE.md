@@ -258,6 +258,9 @@ Rules agreed with the owner:
 - Pickups: a called race won by the other party than last time (Senate seat history; governors
   from web/data/governor.json, 2022, or 2024 for NH and VT). Seats with no earlier result are
   left out, noted under the legend.
+- Runoff calls (added November 10, 2026): `call XX-N Name1 Name2 --runoff --by AP` records who
+  advanced (Louisiana's House primary). Between parties: Runoff grey, undecided. Within one
+  party: won for that party (a pickup if the seat changes party). Shown with → and bold.
 - House seats, past years and tonight (decided November 7, 2026, after Wikipedia's approach):
   previous holder = the one incumbent running (the party of their last win, e.g. Kiley ran
   without a party in 2026), else the last winner of the same district number (approximate

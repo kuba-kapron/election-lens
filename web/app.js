@@ -141,6 +141,7 @@
     return data.counties[sel.id]?.r[year];
   }
   function margin(v) { return v && v[2] ? (v[0] - v[1]) / v[2] : null; }
+  const ARROW = `<svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9.5M8.8 4.3L12.5 8l-3.7 3.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const CHECK = `<svg class="check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   // Party that won this place: most votes, or for the whole country the Electoral College
   function wonBy(sel, y, v) {
@@ -214,7 +215,7 @@
     const ramp = c => stops.map(k => steps(c)(k));
     const ind = v("--ind");
     colors = { dem: ramp(dem), gop: ramp(gop), ind: ramp(ind), nodata: v("--nodata"), demSolid: dem, gopSolid: gop, indSolid: ind,
-      grnSolid: v("--grn"), libSolid: v("--lib"), pending: v("--pending"),
+      grnSolid: v("--grn"), libSolid: v("--lib"), pending: v("--pending"), runoff: v("--runoff"),
       ink: v("--ink"), bg: v("--bg") };
   }
   readColors();
@@ -675,11 +676,11 @@
     sf?.addEventListener("input", () => { listView.q = sf.value; filterList(); });
     if (sf && typing) { sf.focus(); sf.setSelectionRange(sf.value.length, sf.value.length); }
     filterList();
-    racesEl.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => {
-      raceSort = b.dataset.sort;
-      try { localStorage.setItem("raceSort", raceSort); } catch (e) { /* private mode: this visit only */ }
+    racesEl.querySelector("select[data-sort]")?.addEventListener("change", e => {
+      raceSort = e.target.value;
+      try { localStorage.setItem("raceSort", raceSort); } catch (err) { /* private mode: this visit only */ }
       drawPanel();
-    }));
+    });
     // this race at this level in every election: its own card under the races card
     historyEl.innerHTML = historyCard();
     historyEl.hidden = !historyEl.innerHTML;
@@ -869,7 +870,7 @@
     // Every group is set to a form, then all are measured: a long list costs a few layouts, not one per row
     let groups = [
       ...[...document.querySelectorAll(".tug-head")].map(h => ({ names: [...h.querySelectorAll(".pname")], box: n => n })),
-      ...[...document.querySelectorAll(".who .fit")].map(n => ({ names: [n], box: m => m.closest(".who") })),
+      ...[...document.querySelectorAll(".who .fit")].map(n => ({ names: [n], box: m => m.closest(".who-line, .who") })),
     ].filter(g => g.names.length);
     for (let i = 0; groups.length; i++) {
       groups.forEach(g => g.names.forEach(n => show(n, i)));
@@ -991,6 +992,25 @@
   // past years: a line in the tooltip when the seat changed party
   const flipLine = r => (r?.held && r.held !== r.cands[0].caucus ? `<span class="flip">${CAUCUS_NAME[r.cands[0].caucus]} gained the seat</span>` : "");
   // solid winner color; stripes when a seat changed party (Senate seat history; House: same district, same map)
+  // past years: the race in the panel, shown at an earlier round (the November tab of a runoff):
+  // the map follows the tab. Winner: Runoff grey, or the party when both who advanced share it;
+  // Margin: that round's margin
+  // id: the House district (past House races do not carry it); Senate races carry their state
+  function earlierRound(r, id = null) {
+    if (!r || state.round == null || state.round >= r.rounds.length - 1) return null;
+    const st = stateOf(state.sel);
+    const here = id ? state.sel.id === id || (state.sel.type === "state" && id === `${st}-00`) : st === r.st;
+    return here ? state.round : null;
+  }
+  function pastFill(r, id = null) {
+    if (!r) return colors.nodata;
+    const ri = earlierRound(r, id);
+    if (ri == null) return congressCategorical() ? seatFill(r) : leanColor(raceLean(r));
+    const rd = r.rounds[ri];
+    if (!congressCategorical()) return leanColor(lean(r.cands, rd.votes, rd.total));
+    const adv = r.cands.filter((c, i) => r.rounds[ri + 1].votes[i] > 0);
+    return adv.length && adv.every(c => c.caucus === adv[0].caucus) ? colors[ckey(adv[0].caucus) + "Solid"] : colors.runoff;
+  }
   function seatFill(r) {
     const w = ckey(r.cands[0].caucus);
     return r.held && r.held !== r.cands[0].caucus ? `url(#flip-${w})` : colors[w + "Solid"];
@@ -1015,7 +1035,7 @@
         .attr("fill", f => {
           const r = senateRace(f.properties.st);
           if (isLive()) return liveFill(r);
-          return !r ? colors.nodata : congressCategorical() ? seatFill(r) : leanColor(raceLean(r));
+          return pastFill(r);
         });
     } else {
       const races = hRaces();
@@ -1026,7 +1046,7 @@
         .attr("fill", f => {
           const r = races[f.properties.id];
           if (isLive()) return liveFill(r);
-          return !r ? colors.nodata : congressCategorical() ? seatFill(r) : leanColor(raceLean(r));
+          return pastFill(r, f.properties.id);
         });
     }
     drawSelection();
@@ -1151,7 +1171,7 @@
   function raceLegend(el, live) {
     const sen = senLike(), house = state.office === "house";
     const shown = live ? (house ? Object.values(hRaces()) : liveRaces()) : (sen ? sYear() : Object.values(hRaces()));
-    const winnerOf = r => (live ? (r.call && r.call.winner != null ? r.cands[r.call.winner].caucus : counted(r) ? raceLean(r).caucus : null) : r.cands[0]?.caucus);
+    const winnerOf = r => (live ? (seatParty(r) ?? (runoffOf(r) ? null : counted(r) ? raceLean(r).caucus : null)) : r.cands[0]?.caucus);
     const heldOf = r => (live ? heldBy(r)?.caucus : r.held);
     const box = fill => `<svg class="sw" viewBox="0 0 26 10" aria-hidden="true"><rect width="26" height="10" fill="${fill}"/></svg>`;
     const key = (fills, text, title = "") => `<span class="key"${title ? ` title="${title}"` : ""}>${fills.map(box).join("")}${text}</span>`;
@@ -1168,6 +1188,11 @@
         : flipNote(shown.filter(r => !heldOf(r)).length, shown.some(r => heldOf(r)), state.office === "governor" ? "races" : "seats", "");
       if (flipped) items.push(key(["url(#flip-dem)", "url(#flip-gop)"], `${live ? "Pickup" : "Flipped"}${star ? "*" : ""}`,
         live ? "Called, and the seat changes party" : "The seat changed party"));
+      // tonight: a runoff called between parties; past years: the race in the panel at its November round
+      const st = stateOf(state.sel), hid = state.sel.type === "district" ? state.sel.id : st && `${st}-00`;
+      const inView = sen ? senateRace(st) : hRaces()[hid];
+      const pastRunoff = !live && inView && earlierRound(inView, sen ? null : hid) != null && pastFill(inView, sen ? null : hid) === colors.runoff;
+      if (pastRunoff || (live && shown.some(r => runoffOf(r) && !seatParty(r)))) items.push(key([colors.runoff], "Runoff", "Went to a runoff between candidates of different parties"));
       el.innerHTML = items.join("") + pending + noRace + (flipped ? star : "");
       return;
     }
@@ -1233,9 +1258,11 @@
     const credit = pp ? ` data-photo="${c.photo}" title="${attr(`Photo: ${pp.author}, ${/^public domain$/i.test(pp.license) ? "public domain" : pp.license}`)}"` : "";
     return `<span class="avatar" style="background:${fill}" aria-hidden="true"${credit}><span class="ini">${ini.toUpperCase()}</span>${img}</span>`;
   }
+  // winner: true (✓, bold), or the round they advanced to ("runoff", "final round": →, bold)
   function personRow(c, votes, total, winner, lead = 0) {
     const fill = candFill(c);
-    const mark = winner ? ` <span class="won">${CHECK}<span class="sr">winner</span></span>` : "";
+    const mark = typeof winner === "string" ? ` <span class="won" title="Advanced to the ${winner}">${ARROW}<span class="sr">advanced to the ${winner}</span></span>`
+      : winner ? ` <span class="won">${CHECK}<span class="sr">winner</span></span>` : "";
     const facts = [];
     if (c.party === "I" && c.caucus === "D") facts.push("caucuses with the Democrats");
     if (c.inc) facts.push("incumbent");
@@ -1249,13 +1276,15 @@
       <div class="bar"><span style="width:${share * 100}%;background:${fill}"></span></div>
       <span class="votes">${fmtInt(votes)} votes${marginText(lead)}${factText}</span></div></div>`;
   }
-  // candidates with at least 2% (and always the top two), then everyone else as "Others"
+  // candidates with at least 2% (and always the top two), then everyone else as "Others".
+  // winner: the winner's index; or { advanced: Set of indices, to: "runoff" } for an earlier round
   function peopleRows(cands, votes, total, other, winner) {
     const order = votes.map((v, i) => i).sort((a, b) => votes[b] - votes[a]);
     const shown = order.filter((i, k) => k < 2 || (total && votes[i] / total >= 0.02));
     const rest = total - shown.reduce((a, i) => a + votes[i], 0);
     const lead = order.length > 1 ? votes[order[0]] - votes[order[1]] : 0;
-    let html = shown.map((i, k) => personRow(cands[i], votes[i], total, i === winner, k === 0 ? lead : 0)).join("");
+    const mark = i => (winner?.advanced ? (winner.advanced.has(i) ? winner.to : false) : i === winner);
+    let html = shown.map((i, k) => personRow(cands[i], votes[i], total, mark(i), k === 0 ? lead : 0)).join("");
     if (rest > 0) html += candRow("Others", rest, total, "var(--muted)");
     return html;
   }
@@ -1282,7 +1311,10 @@
     const w = r.cands[0].caucus;
     const flip = r.held && r.held !== w
       ? `<p class="note"><strong>Flipped</strong> · ${CAUCUS_NAME[w]} gained the seat from the ${CAUCUS_NAME[r.held]}</p>` : "";
-    return `${roundTabs(r, ri)}<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, 0)}</div>
+    // an earlier round: no winner yet; those in the next round advanced (→, bold)
+    const next = r.rounds[ri + 1];
+    const mark = next ? { advanced: new Set(next.votes.map((v, i) => (v > 0 ? i : -1)).filter(i => i >= 0)), to: next.kind === "runoff" ? "runoff" : "next round" } : 0;
+    return `${roundTabs(r, ri)}<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, mark)}</div>
       <p class="note">${facts.join(" · ")}</p>${flip}${notesList(r.notes)}`;
   }
   function countyBody(r, fips) {
@@ -1361,7 +1393,7 @@
     if (!before) return null;
     const live = +y === LIVE_YEAR;
     const now = Object.entries(houseRaces(y)).filter(([id]) => mine(id)).map(([, r]) => r);
-    const winner = r => (live ? (r.call && r.call.winner != null ? r.cands[r.call.winner].caucus : null) : r.cands[0]?.caucus);
+    const winner = r => (live ? seatParty(r) : r.cands[0]?.caucus);
     const net = { D: 0, R: 0, I: 0 };
     const called = now.filter(winner).length;
     const done = now.length > 0 && called === now.length;
@@ -1389,9 +1421,12 @@
   const districtLabel = (id, r) => `${districtName(id, true)}${isNewSeat(r) ? ` <span class="new" title="New seat: no earlier holder">new</span>` : ""}`;
   // tonight: who is shown (the called winner, else the leader) and the status column
   function liveRowParts(r) {
-    const l = counted(r) ? raceLean(r) : null, called = r.call && r.call.winner != null;
-    const who = called ? personCell(r.cands[r.call.winner]) : l ? personCell(r.cands[l.lead]) : `<span class="muted">${liveStatus(r)}</span>`;
+    const l = counted(r) ? raceLean(r) : null, called = r.call && r.call.winner != null, ro = runoffOf(r);
+    // a runoff: both people, one per line (each shortens to fit, with the party), → in the status column
+    const who = called ? personCell(r.cands[r.call.winner]) : ro ? ro.map(c => `<span class="who-line">${personCell(c)}</span>`).join("")
+      : l ? personCell(r.cands[l.lead]) : `<span class="muted">${liveStatus(r)}</span>`;
     const status = called ? `<span class="won">${CHECK}<span class="sr">won</span></span>`
+      : ro ? `<span class="won" title="${attr(runoffText(r))}">${ARROW}<span class="sr">runoff</span></span>`
       : l ? `<span class="muted">${pctText(r).replace(/ of .*| counted/, "")}</span>` : "";
     return { who, status, lean: l ? leanLabel(l) : "" };
   }
@@ -1406,7 +1441,7 @@
   const liveGroup = r => (counted(r) ? 0 : !r.polls_close || isClosed(r) ? 1 : 2);
   // items: { html, m (signed margin or null), group, close } given in A–Z order
   function raceList(title, items, firstLabel = "A–Z", cls = "") {
-    // every order reverses on a second click of its button: A–Z / Z–A, Closest / Widest, D → R / R → D
+    // six orders: A–Z / Z–A, closest / widest first, most Democratic / most Republican first
     const [base, rev] = [raceSort.replace(/-r$/, ""), raceSort.endsWith("-r")];
     const cmp = {
       az: (a, b) => a.i - b.i,
@@ -1417,12 +1452,12 @@
     const grp = x => (x.m == null ? Math.max(1, x.group ?? 1) : x.group ?? 0);
     const sorted = items.map((x, i) => ({ ...x, i })).sort((a, b) => grp(a) - grp(b)
       || (grp(a) === 0 ? by(a, b) : grp(a) === 2 ? Date.parse(a.close) - Date.parse(b.close) : 0) || a.i - b.i);
-    const firstRev = { "A–Z": "Z–A", "1st–": "Last–" }[firstLabel] || firstLabel;
-    const opts = [["az", firstLabel, firstRev], ["close", "Closest", "Widest"], ["spectrum", "D → R", "R → D"]];
-    const sw = `<div class="mode sort" role="radiogroup" aria-label="Order">${opts.map(([k, label, back]) => {
-      const on = base === k;
-      return `<button type="button" role="radio" aria-checked="${on}" data-sort="${on && !rev ? `${k}-r` : k}" title="Click again to reverse">${on && rev ? back : label}</button>`;
-    }).join("")}</div>`;
+    // every order spelled out in one dropdown (the phone's own picker on phones)
+    const districts = firstLabel === "1st–";
+    const opts = [["az", districts ? "1st–last" : "A–Z"], ["az-r", districts ? "Last–1st" : "Z–A"], ["close", "Closest first"], ["close-r", "Widest first"],
+      ["spectrum", "Most Democratic first"], ["spectrum-r", "Most Republican first"]];
+    const sw = `<label class="list-sort">Sort <select data-sort>${opts.map(([k, label]) =>
+      `<option value="${k}"${k === raceSort || (k === "az" && !opts.some(o => o[0] === raceSort)) ? " selected" : ""}>${label}</option>`).join("")}</select></label>`;
     // long lists: the first LIST_CAP rows and "Show all"; opened when the place in view is further
     // down, so its marked row is never hidden. A filter field searches the whole list
     const long = sorted.length > LIST_CAP, key = `${state.office}|${title}`;
@@ -1678,6 +1713,7 @@
     }));
     panel.querySelectorAll("[data-round]").forEach(b => b.addEventListener("click", () => {
       state.round = +b.dataset.round;
+      drawMap();  // the race's state or district follows the tab
       drawPanel();
     }));
   }
@@ -1700,18 +1736,26 @@
     return { caucus: w.caucus, name: w.name, year: p.year };
   }
   const isNewSeat = r => !!(isHouseRace(r) ? (heldBy(r), r.holder) : r.holder)?.newSeat;
+  // a hand call: the winner, or the two who advanced to a runoff (no winner yet)
+  const callWinner = r => (r?.call && r.call.winner != null ? r.cands[r.call.winner] : null);
+  const runoffOf = r => (r?.call?.advanced?.length ? r.call.advanced.map(i => r.cands[i]) : null);
+  // the party that holds the seat for certain: a called winner's, or that of a runoff between two
+  // of its own candidates (Louisiana's all-candidate primary); counted as won in the totals
+  function seatParty(r) {
+    const w = callWinner(r), ro = runoffOf(r);
+    return w ? w.caucus : ro && ro.every(c => c.caucus === ro[0].caucus) ? ro[0].caucus : null;
+  }
+  const runoffText = r => { const ro = runoffOf(r); return ro ? `Runoff: ${ro.map(c => c.name).join(" and ")}` : ""; };
   function pickup(r) {
-    if (!r || !r.call || r.call.winner == null) return null;
-    const held = heldBy(r), won = r.cands[r.call.winner];
-    return held && held.caucus !== won.caucus ? { won, held } : null;
+    const party = seatParty(r), held = party && heldBy(r);
+    return held && held.caucus !== party ? { won: callWinner(r) || runoffOf(r)[0], held } : null;
   }
   function liveFill(r) {
     if (!r) return colors.nodata;
     if (state.cmap === "margin") return counted(r) ? leanColor(raceLean(r)) : colors.pending;
-    if (r.call && r.call.winner != null) {
-      const c = ckey(r.cands[r.call.winner].caucus);
-      return pickup(r) ? `url(#flip-${c})` : colors[c + "Solid"];
-    }
+    const party = seatParty(r);
+    if (party) return pickup(r) ? `url(#flip-${ckey(party)})` : colors[ckey(party) + "Solid"];
+    if (runoffOf(r)) return colors.runoff;  // a runoff between parties: undecided
     if (!counted(r)) return colors.pending;
     return colors[ckey(raceLean(r).caucus)][1]; // leading, not called: one light shade
   }
@@ -1720,6 +1764,7 @@
   const pctShort = r => (r.pct == null ? "" : ` <span title="${pctText(r)}">(${r.pct < 1 && r.pct > 0 ? "<1" : Math.round(r.pct)}%)</span>`);
   function liveStatus(r) {
     if (r.call && r.call.winner != null) return `Called for ${r.cands[r.call.winner].name} by ${r.call.by}`;
+    if (runoffOf(r)) return `${runoffText(r)}, called by ${r.call.by}`;
     if (counted(r)) return pctText(r) || "Counting";
     if (!isClosed(r)) return `Polls close at ${clock(r.polls_close)}`;
     return "Polls closed, no votes counted yet";
@@ -1763,15 +1808,17 @@
   function liveRaceBody(r, id = r.id) {
     let html = r.test ? `<p class="test-flag">Test data, not real results</p>` : "";
     if (!counted(r)) {
-      const called = r.call && r.call.winner != null;
-      html += `<div class="cand">${r.cands.map((c, i) => personRow(c, 0, 0, called && i === r.call.winner)).join("")}</div>
-        <p class="note">${[called ? `Called by ${r.call.by}` : liveStatus(r), isNewSeat(r) ? "New seat" : ""].filter(Boolean).join(" · ")}</p>${called ? pickupText(r) : ""}`;
+      const called = r.call && r.call.winner != null, adv = new Set(r.call?.advanced || []);
+      html += `<div class="cand">${r.cands.map((c, i) => personRow(c, 0, 0, adv.has(i) ? "runoff" : called && i === r.call.winner)).join("")}</div>
+        <p class="note">${[called ? `Called by ${r.call.by}` : adv.size ? `Runoff, called by ${r.call.by}` : liveStatus(r), isNewSeat(r) ? "New seat" : ""].filter(Boolean).join(" · ")}</p>${pickupText(r)}`;
     } else {
       const rd = roundOf(r), l = raceLean(r), called = r.call && r.call.winner != null;
-      html += `<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, called ? 0 : -1)}</div>`;
+      // a runoff call: the two who advanced in bold with →, no winner yet
+      const ro = runoffOf(r);
+      html += `<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, ro ? { advanced: new Set(r.call.advanced), to: "runoff" } : called ? 0 : -1)}</div>`;
       // the bars say who won or leads; the grey lines say who called it and how much is counted
-      const facts = [called ? `Called by ${r.call.by}` : "", `${fmtInt(rd.total)} votes counted${pctShort(r)}`, isNewSeat(r) ? "New seat" : ""].filter(Boolean);
-      html += `<p class="note">${facts.join(" · ")}</p>${called ? pickupText(r) : ""}`;
+      const facts = [called ? `Called by ${r.call.by}` : ro ? `Runoff, called by ${r.call.by}` : "", `${fmtInt(rd.total)} votes counted${pctShort(r)}`, isNewSeat(r) ? "New seat" : ""].filter(Boolean);
+      html += `<p class="note">${facts.join(" · ")}</p>${pickupText(r)}`;
       // the source sits with the numbers it gave, above the chart
       html += liveSource(r) + `<div class="trail" data-trail="${id}"></div>`;
       return html;
@@ -1792,7 +1839,9 @@
     const b = { D: { notUp: 0, called: 0, leading: 0 }, R: { notUp: 0, called: 0, leading: 0 }, I: { notUp: 0, called: 0, leading: 0 }, pending: 0 };
     for (const x of liveFile("senate")?.notUp?.seats || []) if (x.party) b[x.party].notUp++;
     for (const r of liveRaces("senate")) {
-      if (r.call && r.call.winner != null) b[r.cands[r.call.winner].caucus].called++;
+      const party = seatParty(r);
+      if (party) b[party].called++;
+      else if (runoffOf(r)) b.pending++;  // a runoff between parties: undecided
       else if (counted(r)) b[raceLean(r).caucus].leading++;
       else b.pending++;
     }
@@ -1850,8 +1899,8 @@
       const held = heldBy(r);
       if (!held) { g.unknown++; continue; }
       g.any = true;
-      const called = r.call && r.call.winner != null;
-      const c = called ? r.cands[r.call.winner].caucus : counted(r) ? raceLean(r).caucus : null;
+      const called = !!seatParty(r);
+      const c = called ? seatParty(r) : runoffOf(r) ? null : counted(r) ? raceLean(r).caucus : null;
       if (!c || c === held.caucus) continue;
       (called ? g.won : g.lead)[c]++;
       (called ? g.lost : g.leadLost)[held.caucus]++;
@@ -2043,9 +2092,11 @@
   // ---------- live House: 435 races, leaders only (no calls) ----------
   // per caucus: seats won (called by hand, with who called them) and seats leading
   function liveHouseTally(races) {
-    const t = { D: 0, R: 0, I: 0, none: 0, won: { D: 0, R: 0, I: 0 } };
+    const t = { D: 0, R: 0, I: 0, none: 0, runoff: 0, won: { D: 0, R: 0, I: 0 } };
     for (const r of races) {
-      if (r.call && r.call.winner != null) { const c = r.cands[r.call.winner].caucus; t[c]++; t.won[c]++; continue; }
+      const party = seatParty(r);
+      if (party) { t[party]++; t.won[party]++; continue; }
+      if (runoffOf(r)) { t.runoff++; continue; }  // a runoff between parties: undecided
       const l = counted(r) ? raceLean(r) : null;
       if (l) t[l.caucus]++; else t.none++;
     }

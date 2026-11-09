@@ -6,6 +6,7 @@ on its next round (within a minute).
     uv run pipeline/live_manual.py call GA-sen Ossoff --by AP     # someone has called the race
     uv run pipeline/live_manual.py uncall GA-sen
     uv run pipeline/live_manual.py call KY-3 McGarvey --by AP     # House district (KY-AL / WY-AL at large)
+    uv run pipeline/live_manual.py call XX-N Name1 Name2 --runoff --by AP   # who advanced to a runoff
     uv run pipeline/live_manual.py show
 
 Names are last names as the page shows them; race ids are in pipeline/live_races.py
@@ -78,7 +79,8 @@ def main():
     c.add_argument("race")
     k = sub.add_parser("call", help="record that a race has been called")
     k.add_argument("race")
-    k.add_argument("winner", help="last name")
+    k.add_argument("winner", nargs="+", help="last name; two last names with --runoff")
+    k.add_argument("--runoff", action="store_true", help="the two named advanced to a runoff (no winner yet)")
     k.add_argument("--by", required=True, help='who called it, e.g. "AP"')
     u = sub.add_parser("uncall", help="remove a race call")
     u.add_argument("race")
@@ -117,12 +119,16 @@ def main():
         save(MANUAL, manual)
         print(f"{rid}: manual entry removed; automatic sources again")
     elif a.cmd == "call":
-        if a.winner.lower() not in names:
-            sys.exit(f"Winner must be one of: {', '.join(names.values())}")
-        calls[rid] = {"winner": names[a.winner.lower()], "by": a.by,
-                      "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        if len(a.winner) != (2 if a.runoff else 1):
+            sys.exit("Name two candidates with --runoff, one winner without it.")
+        bad = [w for w in a.winner if w.lower() not in names]
+        if bad:
+            sys.exit(f"{', '.join(bad)}: not a candidate. Candidates: {', '.join(names.values())}")
+        at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        picked = [names[w.lower()] for w in a.winner]
+        calls[rid] = {"runoff": picked, "by": a.by, "at": at} if a.runoff else {"winner": picked[0], "by": a.by, "at": at}
         save(CALLS, calls)
-        print(f"{rid}: called for {calls[rid]['winner']} by {a.by}")
+        print(f"{rid}: {'runoff between ' + ' and '.join(picked) if a.runoff else 'called for ' + picked[0]}, by {a.by}")
     elif a.cmd == "uncall":
         calls.pop(rid, None)
         save(CALLS, calls)
