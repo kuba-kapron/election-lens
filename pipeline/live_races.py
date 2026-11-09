@@ -1,11 +1,11 @@
-"""The races followed live on 3 November 2026, and where their numbers come from.
+"""The races followed live on November 3, 2026, and where their numbers come from.
 
 Each race lists its sources in order of preference: the state's official results first,
 civicAPI (unofficial, civicapi.org) as the fallback. Louisiana's robots.txt does not allow
 scripts on its results data, Ohio's and Michigan's sites block scripts, Georgia's 2026
 results were not published yet, and Mississippi and Maine have no statewide live results,
 so those races start on civicAPI. Manual entries (pipeline/live_manual.py) override both.
-The other 25 Senate races (added later on 3 November) use civicAPI only.
+The other 25 Senate races (added later on November 3) use civicAPI only.
 
 Poll closing times: CBS News, "Here's when polls open and close for 2026 midterm elections"
 (https://www.cbsnews.com/news/when-polls-open-close-2026-midterm-elections/), which gives the
@@ -70,7 +70,7 @@ RACES = [
      "prev": (2020, "regular"),
      "cands": [("Jamie Davis", "D"), ("Julia Letlow", "R")],
      "sources": [{"kind": "civicapi", "race": 87183}]},
-    # the other 34 governor races (added 3 November): official where we have a reader, else civicAPI
+    # the other 34 governor races (added November 3): official where we have a reader, else civicAPI
     {"id": "AK-gov", "st": "AK", "office": "governor", "seat": "governor", "close": "state", "prev": None,
      "cands": [('Jonathan Kreiss-Tomkins', 'D'), ('Dave Bronson', 'R'), ('Treg Taylor', 'R'), ('Bernadette Wilson', 'R')],
      "sources": [{'kind': 'civicapi', 'race': 148898}]},
@@ -289,7 +289,7 @@ STATE_CLOSE = {
 
 
 def close_times(st):
-    """(polls_close, all_closed) as ISO times; 23:00 means the evening of 3 November."""
+    """(polls_close, all_closed) as ISO times; 23:00 means the evening of November 3."""
     t = STATE_CLOSE[st]
     first, last = t if isinstance(t, tuple) else (t, t)
     iso = lambda hm: ("2026-11-03T" if hm >= "12:00" else "2026-11-04T") + hm + "Z"
@@ -297,16 +297,16 @@ def close_times(st):
 
 
 # House: all 435 races come from one civicAPI request (its race search); civicAPI's own race
-# calls are not used. Louisiana's House vote on 3 November is a primary with every candidate
-# on one ballot; its House general election is on 12 December (moved after the 2026 map;
+# calls are not used. Louisiana's House vote on November 3 is a primary with every candidate
+# on one ballot; its House general election is on December 12 (moved after the 2026 map;
 # Wikipedia, "2025–2026 United States redistricting").
 HOUSE_SEARCH = "https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives&election_date=2026-11-03&limit=1000"
 # One state at a time: on election night the all-states list (700 KB) failed with 502s while
 # a single state's (15 KB, about 30 s) came through; pipeline/live.py asks a few per round.
 HOUSE_STATE_SEARCH = ("https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives"
                       "&province={st}&election_date=2026-11-03&limit=60")
-HOUSE_NOTES = {"LA": "Louisiana's House vote on 3 November is a primary with every candidate on one ballot; "
-                     "the House general election is on 12 December."}
+HOUSE_NOTES = {"LA": "Louisiana's House vote on November 3 is a primary with every candidate on one ballot; "
+                     "the House general election is on December 12."}
 
 SUFFIXES = {"JR", "JR.", "SR", "SR.", "II", "III", "IV"}
 

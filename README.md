@@ -4,7 +4,7 @@ Election Lens is an open-source website for exploring election results at every 
 
 ## Status
 
-Early development. Working now: US presidential results by county, 2000–2024, and Senate (by state and county) and House (by district) results, 2020–2024. Next milestone: live tracking of key races in the US midterm elections on 3 November 2026.
+Early development. Working now: US presidential results by county, 2000–2024, and Senate (by state and county) and House (by district) results, 2020–2024. Next milestone: live tracking of key races in the US midterm elections on November 3, 2026.
 
 ## Run it locally
 
@@ -60,7 +60,7 @@ Party icons: put them in `photos/parties/` named by party code (`D.svg`, `R.svg`
 - United States: Senate results by state and county and House results by district, 2020–2024, with seats won, Senate seats that changed party, runoffs and ranked-choice rounds
 
 **Next**
-- Live results on election night, 3 November 2026, for:
+- Live results on election night, November 3, 2026, for:
   - Senate: Texas, Michigan, Georgia, North Carolina, South Carolina, Florida, Louisiana, Mississippi, Maine, Ohio
   - Governor: Ohio, Texas
 - Certified 2026 US results; a Shift view for Senate and House; House/Senate before 2020

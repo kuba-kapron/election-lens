@@ -1,5 +1,5 @@
 """Download the candidate photos the owner approved from the review sheet made by
-pipeline/find_commons_photos.py (all 14 free-licensed photos were approved on 3 November 2026).
+pipeline/find_commons_photos.py (all 14 free-licensed photos were approved on November 3, 2026).
 
     uv run pipeline/fetch_commons_photos.py            # every photo marked "needs your approval"
     uv run pipeline/fetch_commons_photos.py nc-cooper  # only these keys

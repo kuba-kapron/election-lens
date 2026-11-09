@@ -73,8 +73,8 @@ FLIPS = {
 }
 LATER_NOTES = {
     (2024, "AZ", "regular"): "The seat was held by Kyrsten Sinema, elected as a Democrat in 2018, who became an independent in December 2022.",
-    (2024, "CA", "regular"): "California held two Senate races on the same ballot, both between Adam Schiff and Steve Garvey: this one for the full six-year term, and a special election for the last weeks of Dianne Feinstein's term, to 3 January 2025.",
-    (2024, "CA", "special"): "California held two Senate races on the same ballot, both between Adam Schiff and Steve Garvey: this one for the last weeks of Dianne Feinstein's term, to 3 January 2025 (Laphonza Butler held the seat by appointment after Feinstein died), and the regular election for the full six-year term.",
+    (2024, "CA", "regular"): "California held two Senate races on the same ballot, both between Adam Schiff and Steve Garvey: this one for the full six-year term, and a special election for the last weeks of Dianne Feinstein's term, to January 3, 2025.",
+    (2024, "CA", "special"): "California held two Senate races on the same ballot, both between Adam Schiff and Steve Garvey: this one for the last weeks of Dianne Feinstein's term, to January 3, 2025 (Laphonza Butler held the seat by appointment after Feinstein died), and the regular election for the full six-year term.",
 }
 
 # Display names: the short form each candidate is commonly known by, without middle names.
@@ -119,7 +119,7 @@ KNOWN_DIFFS = {
     # ranked-choice tabulation whose round 1 differs slightly. The rounds shown here are the
     # FEC's (114,118 -> 115,759 -> 136,330 for Murkowski); MEDSL has the same round 1 and
     # Wikipedia the same final round. The Division of Elections' preliminary tabulation of
-    # 23 November 2022 (final round 135,972) was before certification.
+    # November 23, 2022 (final round 135,972) was before certification.
     (2022, "AK", "regular", "Murkowski"): "Clerk uses Alaska's first-choice summary, not RCV round 1",
     (2022, "AK", "regular", "Tshibaka"): "Clerk uses Alaska's first-choice summary, not RCV round 1",
     # FEC and the Clerk agree (1,146,966 / 872,694); MEDSL's figures predate certification.

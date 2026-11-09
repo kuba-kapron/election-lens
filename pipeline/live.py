@@ -1,4 +1,4 @@
-"""Live results importer for election night, 3 November 2026. Writes web/data/live/<office>.json:
+"""Live results importer for election night, November 3, 2026. Writes web/data/live/<office>.json:
 senate.json, governor.json, house.json, so the page reloads only the office being viewed. Each
 file: {"office", "updated", "races": {id: race}, "night"}; the Senate file also has "not_up"
 (seats not up tonight, for the balance); "night" is the same small summary in every file

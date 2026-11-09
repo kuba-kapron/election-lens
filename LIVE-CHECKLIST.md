@@ -1,4 +1,4 @@
-# Election night checklist, 3–4 November 2026
+# Election night checklist, November 3–4, 2026
 
 Times are Warsaw time (CET).
 

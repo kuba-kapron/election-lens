@@ -1,6 +1,6 @@
 """Polite HTTP for the live importer. Every request to a results site goes through fetch().
 
-Rules (agreed with the owner, 3 November 2026):
+Rules (agreed with the owner, November 3, 2026):
 - at most one request per address every MIN_INTERVAL seconds; a call that comes sooner gets
   the stored copy instead of a new request;
 - at least SPACING seconds between any two requests to the same site, so many addresses on
