@@ -85,7 +85,7 @@
       }
     }
   }
-  // Year first, then the race: every year we have, and which races each year has.
+  // The race first, then the year: the ribbon lists the years the race in view has.
   // 2026 is election night: Senate and governor races from the live results file.
   const OFFICES = ["president", "senate", "house", "governor"];
   const years = data.years; // presidential years
@@ -105,7 +105,9 @@
   };
   // the race to show for a year: the one picked if that year has it, else president or Senate
   const officeFor = (y, o) => (HAS[o](y) ? o : ["president", "senate"].find(x => HAS[x](y)));
-  const curYears = () => ALL_YEARS;
+  const curYears = () => ALL_YEARS.filter(y => HAS[state.office](y));
+  // a race picked in a year without it: the nearest earlier year that has it, else the latest
+  const yearFor = (o, y) => [...ALL_YEARS].reverse().find(x => HAS[o](x) && x <= y) ?? [...ALL_YEARS].reverse().find(x => HAS[o](x));
   const counties = topojson.feature(geo, geo.objects.counties).features;
   const ct2023 = topojson.feature(geo, geo.objects.ct2023).features;
   const states = topojson.feature(geo, geo.objects.states).features;
@@ -613,33 +615,69 @@
   }
 
   // ---------- year ribbon ----------
-  const yearList = d3.select("#year-list");
+  // One row of the race's years, scrolling sideways when they do not fit. Under each year a thin
+  // bar in the winner's color (the Electoral College winner; the Senate or House majority);
+  // tonight's bar is light while races are still being called. The result is in the hover text.
+  const yearList = d3.select("#year-list"), yearOl = document.getElementById("year-list");
+  function yearResult(y) {
+    const o = state.office, seats = (D, R) => (D > R ? "D" : R > D ? "R" : null);
+    if (y === LIVE_YEAR) {
+      let D, R;
+      if (o === "senate") { const b = senateBalance(); [D, R] = ["D", "R"].map(p => b[p].notUp + b[p].called + b[p].leading); }
+      else if (o === "house") {
+        // tonight's House file loads with its page; for the bar, fetch it once and draw again
+        if (!extra.live?.house && !yearResult.asked) { yearResult.asked = true; loadLive("house").then(drawYears); }
+        ({ D, R } = liveHouseTally(Object.values(houseRaces(y))));
+      }
+      else return { party: null, text: `${y}: live` };
+      const p = seats(D, R);
+      return { party: p, light: true, text: `${y} so far: ${CAUCUS_NAME[p] ?? "Even"} ${Math.max(D, R)}–${Math.min(D, R)} (won or leading${o === "senate" ? ", with the seats not up" : ""})` };
+    }
+    if (o === "president") {
+      const c = data.candidates[y], [d, r] = ec(y).won, p = c.won === "dem" ? "D" : "R";
+      return { party: p, text: `${y}: ${fullName(c[c.won])} won, ${Math.max(d, r)}–${Math.min(d, r)} electoral votes` };
+    }
+    const c = o === "senate" ? extra.senate.control[y] : extra.house.seats[y];
+    if (!c) return { party: null, text: String(y) };
+    const p = o === "senate" ? senateControl(c, y) : seats(c.D, c.R);
+    return { party: p, text: `${y}: ${CAUCUS_NAME[p] ?? "Even"} ${Math.max(c.D, c.R)}–${Math.min(c.D, c.R)} seats` };
+  }
   function drawYears() {
     const ys = curYears();
-    document.querySelector(".years ol").style.setProperty("--cols", ys.length);
     yearList.selectAll("li").data(ys, y => y).join(enter => {
       const li = enter.append("li");
       li.append("button").attr("type", "button").on("click", (e, y) => setYear(y));
       return li;
     }).select("button")
       .attr("aria-current", y => String(y === state.year))
-      .html(y => {
-        if (y === LIVE_YEAR) return liveYearLabel();
-        const o = officeFor(y, state.office);
-        if (o !== "president") return congressYearLabel(y, o);
-        const v = data.nation[y], m = margin(v), c = data.candidates[y];
-        // bold = Electoral College winner
-        const nm = p => (c.won === p ? `<b class="is-winner">${c[p]}</b>` : c[p]);
-        const [d, r] = ec(y).won;
-        // names: the Electoral College winner first
-        const order = winnerFirst(y);
-        const ev = { dem: `<span class="mg d">${d}</span>`, gop: `<span class="mg r">${r}</span>` };
-        const score = categorical()
-          ? order.map(p => ev[p]).join("–")
-          : `<span class="mg ${m >= 0 ? "d" : "r"}">${mlabel(m)}</span>`;
-        // winner only: nine years share the ribbon
-        return `<span class="yr">${y}</span><span class="who" title="${c[order[0]]} vs. ${c[order[1]]}">${score} ${nm(order[0])}</span>`;
+      .each(function (y) {
+        const r = yearResult(y);
+        this.title = r.text;
+        const bar = r.party ? `<i class="yr-bar${r.light ? " light" : ""}" style="background:${colors[ckey(r.party) + "Solid"]}"></i>` : `<i class="yr-bar none"></i>`;
+        this.innerHTML = `<span class="yr">${y}${bar}</span>${y === LIVE_YEAR ? liveTag() : ""}`;
       });
+    // ‹ ›: the previous or next year of this race
+    const i = ys.indexOf(state.year);
+    document.querySelectorAll(".years-step").forEach(b => { b.disabled = +b.dataset.step < 0 ? i <= 0 : i >= ys.length - 1; });
+    // keep the chosen year in view
+    const cur = yearOl.querySelector('[aria-current="true"]');
+    if (cur) {
+      const l = cur.offsetLeft - yearOl.offsetLeft, r = l + cur.offsetWidth;
+      if (l < yearOl.scrollLeft) yearOl.scrollLeft = l - 8;
+      else if (r > yearOl.scrollLeft + yearOl.clientWidth) yearOl.scrollLeft = r - yearOl.clientWidth + 8;
+    }
+  }
+  document.querySelectorAll(".years-step").forEach(b => b.addEventListener("click", () => {
+    const ys = curYears(), y = ys[ys.indexOf(state.year) + +b.dataset.step];
+    if (y) setYear(y);
+  }));
+  // the country menu: one country for now
+  {
+    const box = document.getElementById("country"), btn = box.querySelector(".country-btn"), menu = box.querySelector(".country-menu");
+    const show = on => { menu.hidden = !on; btn.setAttribute("aria-expanded", String(on)); };
+    btn.addEventListener("click", () => show(menu.hidden));
+    document.addEventListener("click", e => { if (!box.contains(e.target)) show(false); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !menu.hidden) { show(false); btn.focus(); } });
   }
 
   // ---------- panel ----------
@@ -1215,19 +1253,7 @@
     }
     return t;
   }
-  function congressYearLabel(y, office = state.office) {
-    const sen = office === "senate";
-    if (state.cmap === "margin") {
-      const v = sen ? senatePopular(y) : extra.house.popular[y], m = margin(v);
-      return `<span class="yr">${y}</span><span class="who"><span class="mg ${m >= 0 ? "d" : "r"}">${mlabel(m)}</span> popular vote</span>`;
-    }
-    const c = sen ? extra.senate.control[y] : extra.house.seats[y];
-    const lead = c.R > c.D ? "R" : c.D > c.R ? "D" : null;
-    const order = lead === "R" ? ["R", "D"] : ["D", "R"];
-    const score = order.map(p => `<span class="mg ${p === "D" ? "d" : "r"}">${c[p]}</span>`).join("–");
-    const who = lead ? `<b class="is-winner">${CAUCUS_NAME[lead]}</b>` : "tied";
-    return `<span class="yr">${y}</span><span class="who">${score} ${who}</span>`;
-  }
+
 
   // ---------- Senate and House panel ----------
   // Official portrait for anyone who has served in Congress (img/congress/<Congress ID>.jpg),
@@ -1775,15 +1801,12 @@
     return `<span class="tip-rows">${tipRows(r.cands, rd.votes, rd.total, winner)}</span>${leanLabel(raceLean(r))}
       <span class="hint">${liveStatus(r)}${r.test ? " · TEST DATA" : ""}</span>`;
   }
-  function liveYearLabel() {
-    const night = extra.live?.night, called = night?.senate_calls || { D: 0, R: 0, I: 0 };
-    const n = called.D + called.R + called.I;
+  // "Live" next to 2026, with the time of the last update under it
+  function liveTag() {
+    const night = extra.live?.night, on = !!night?.counting;
     const upd = liveFile()?.updated || liveFile("senate")?.updated;
-    const on = !!night?.counting;
-    // right of the year: the Live tag with the update time under it; the calls on the line below
     const time = upd ? `<span class="live-time" title="Results updated at ${clock(upd)}">${clock(upd)}</span>` : "";
-    const tag = `<span class="live-stack"><span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>${time}</span>`;
-    return `<span class="yr">2026${tag}</span><span class="who">${n ? `Senate calls: <span class="mg d">${called.D}</span>–<span class="mg r">${called.R}</span>${called.I ? `–<span class="mg i">${called.I}</span>` : ""}` : "live tonight"}</span>`;
+    return `<span class="live-stack"><span class="live-tag${on ? " on" : ""}" title="${on ? "Results are coming in" : "Live tonight: no votes counted yet"}"><span class="live-dot"></span>Live</span>${time}</span>`;
   }
   // "Source: Texas Secretary of State (official results), checked 22:48." The county panel names
   // the county figures' source; the race panel adds it when it differs from the totals' source
@@ -2263,8 +2286,10 @@
     select(state.sel, officeChanged);
   }
   async function setOffice(o) {
-    if (o === state.office || !HAS[o](state.year)) return;
-    await ensureData(o, state.year);
+    if (o === state.office) return;
+    const y = HAS[o](state.year) ? state.year : yearFor(o, state.year);
+    await ensureData(o, y);
+    state.year = y;
     state.office = o;
     state.round = null;
     state.seat = "regular";
@@ -2283,10 +2308,10 @@
   function syncToggles() {
     const pres = state.office === "president";
     document.querySelectorAll("[data-office]").forEach(b => {
+      // every race can be picked: one without this year opens its nearest year
       const o = b.dataset.office, ok = HAS[o](state.year);
       b.setAttribute("aria-checked", String(o === state.office));
-      b.setAttribute("aria-disabled", String(!ok));
-      b.title = ok ? "" : WHY_NOT[o](state.year);
+      b.title = ok ? "" : `${WHY_NOT[o](state.year)}: opens ${yearFor(o, state.year)}`;
     });
     const shown = state.mode === "shift" ? "shift" : state.level === "counties" ? "margin" : state.cmap;
     document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === shown)));

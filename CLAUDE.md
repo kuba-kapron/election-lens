@@ -18,9 +18,6 @@ US presidential results 2000–2024 on one static page (`web/`):
   Democrats, right = toward Republicans, length = size of shift, constant screen size when
   zoomed). Winner colors states only (the county map shows the margin). Maine and Nebraska
   show a badge with the second candidate's district electoral votes in split years.
-  The year ribbon follows the map: electoral votes or seats under Winner, the popular-vote
-  margin under Margin and Shift. (Decided November 4, 2026; replaced the panel's Electoral
-  College | Popular vote and Seats | Popular vote tabs.)
 - Country panels: electoral votes (president) or one totals bar per office (Senate, House,
   governors; also a state's House delegation): logos and big counts of certain seats, ▲ gained
   ▼ lost (green/red), Democrats from the left, Republicans from the right, light = leading,
@@ -28,11 +25,16 @@ US presidential results 2000–2024 on one static page (`web/`):
 - Side panel: results with candidate portraits (or initials), full names, winner checkmark
   and bold, margin history chart. Tooltips with share bars (Margin) or a compact shift line.
 - Light/dark toggle (follows the system until clicked, then remembered in localStorage).
-- Navigation is year first, then race: one ribbon with every year we have (2000–2026); the
-  races (President | Senate | House | Governor) are the site navigation in the top bar next
-  to the wordmark (own row on phones); races without data that year are greyed out
-  with the reason on hover. Switching years keeps the race when that year has it, else
-  President, else Senate (decided with the owner on November 3, 2026).
+- Navigation is race first, then year (decided November 10, 2026): the races (President |
+  Senate | House | Governor) are the site navigation in the top bar (own row on phones); the
+  year ribbon lists only the years the race in view has, in one row that scrolls sideways
+  (‹ ›, arrow keys), each year with a thin bar in the winner's color (Electoral College
+  winner; Senate or House majority; light for tonight) and the result on hover. Picking a race
+  the year in view lacks opens its nearest earlier year (else its latest). Two elections of one
+  kind in a year will be labeled "2019 Apr".
+- Country selector next to the wordmark: flag (SVG in a 24×16 box at its own proportions, the
+  outline drawn over its edge; each flag SVG needs width and height) and name; one country for
+  now. US flag drawn to the official proportions, colors from the DDD-F-416E version.
 - City names on the map (added November 3, 2026): the largest metros for the whole country,
   more as you zoom in; the selected state's cities first, neighbors in grey; a name goes right
   of its dot, else left, below or above, never over another name, and avoids covering other
