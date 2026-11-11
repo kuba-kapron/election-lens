@@ -642,8 +642,16 @@
     const p = o === "senate" ? senateControl(c, y) : seats(c.D, c.R);
     return { party: p, text: `${y}: ${CAUCUS_NAME[p] ?? "Even"} ${Math.max(c.D, c.R)}–${Math.min(c.D, c.R)} seats` };
   }
+  // how many years are in view: as many whole ones as fit at --year-min (CSS), at most all of them
+  function sizeYears() {
+    const min = parseFloat(getComputedStyle(yearOl).getPropertyValue("--year-min")) || 100;
+    const n = Math.max(1, Math.min(curYears().length, Math.floor(yearOl.clientWidth / min)));
+    yearOl.style.setProperty("--years-in-view", n);
+  }
+  new ResizeObserver(() => { sizeYears(); }).observe(yearOl.parentElement);
   function drawYears() {
     const ys = curYears();
+    sizeYears();
     yearList.selectAll("li").data(ys, y => y).join(enter => {
       const li = enter.append("li");
       li.append("button").attr("type", "button").on("click", (e, y) => setYear(y));

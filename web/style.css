@@ -205,7 +205,9 @@ h1 {
   border-top: 1px solid var(--rule);
 }
 .years ol::-webkit-scrollbar { display: none; }
-.years li { flex: 1 0 auto; min-width: 84px; }
+/* as many whole years as fit at --year-min each (counted in app.js), sharing the row evenly */
+.years ol { --year-min: 110px; }
+.years li { flex: 0 0 calc(100% / var(--years-in-view, 7)); min-width: 0; }
 .years-step { background: none; border: 0; border-top: 1px solid var(--rule); padding: 0 10px; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; }
 .years-step:hover:not(:disabled) { color: var(--ink); }
 .years-step:disabled { opacity: 0.3; cursor: default; }
@@ -728,7 +730,10 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .masthead, .years, .stage, .colophon { padding-left: 16px; padding-right: 16px; }
   .races { margin-left: 16px; margin-right: 16px; }
   .years .yr { font-size: 16px; }
-  .years li { min-width: 64px; }
+  .years ol { --year-min: 72px; }
+  /* the country fits on the wordmark row, next to the theme toggle */
+  .country { margin-left: 12px; }
+  .country-btn { font-size: 14px; gap: 6px; }
   .years-step { padding: 0 6px; }
   /* phone: the race links get their own row under the wordmark */
   .masthead-row { flex-wrap: wrap; }
@@ -738,6 +743,11 @@ img.party { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: 
   .mode button { padding: 6px 8px; font-size: 13px; }
   .combo { width: 100%; margin-left: 0; }
   .combo input, .races-head .list-search, .list-sort select { font-size: 16px; } /* below 16px iOS Safari zooms the page on focus */
+}
+
+/* the narrowest phones: the flag alone (the name is in the menu and the button's label) */
+@media (max-width: 400px) {
+  .country-btn .country-name { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
