@@ -221,7 +221,11 @@ Rules agreed with the owner:
   switch, vacancy, or an error in either source) the seat gets a note for a person to check,
   and nothing stops.
   Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
-  (Vice President Vance breaks ties).
+  (Vice President Vance breaks ties). One rule for every year (decided November 12, 2026,
+  `tieBreaker()` in app.js): a 50–50 Senate goes to the Vice President's party, taken from the
+  presidential results: the sitting VP in a midterm, the incoming one in a presidential year
+  (undecided at 50–50 until that race is decided). The panel's majority mark counts certain
+  seats only; the ribbon and the History card count leads too ("so far").
 - House (added November 3): all 435 races from one civicAPI request per round (its race search,
   type "House of Representatives"), then official results replace them district by district
   for 16 states (pipeline/us/live/house.py: NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT

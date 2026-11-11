@@ -645,7 +645,7 @@
         ({ D, R } = liveHouseTally(Object.values(houseRaces(y))));
       }
       else return { party: null, text: `${y}: live` };
-      const p = seats(D, R);
+      const p = o === "senate" ? senateControl({ D, R }, y) : seats(D, R);
       return { party: p, light: true, text: `${y} so far: ${CAUCUS_NAME[p] ?? "Even"} ${Math.max(D, R)}–${Math.min(D, R)} (won or leading${o === "senate" ? ", with the seats not up" : ""})` };
     }
     if (o === "president") {
@@ -1370,10 +1370,20 @@
     return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], l.lead)}</div>
       <p class="note">${fmtInt(v[n + 1])} votes · ${note}</p>${notesList(r.notes)}`;
   }
-  // the vice president's party when the new Senate met (breaks 50–50 ties): Harris from
-  // January 2021 and 2023, Vance from January 2025
-  const SENATE_VP = { 2020: "D", 2022: "D", 2024: "R" };
-  const senateControl = (c, y) => (c.D > c.R ? "D" : c.R > c.D ? "R" : SENATE_VP[y] ?? null);
+  // The party that breaks a 50–50 tie in the Senate elected in year y: the Vice President's.
+  // A midterm: the sitting VP, from the last presidential election (Vance for 2026). A presidential
+  // year: the incoming VP, so unknown (null) until that race is decided (Harris for the 2020 Senate)
+  const tieBreaker = y => {
+    const p = data.candidates[+y % 4 ? +y - (+y % 4) : +y]?.won;
+    return p ? (p === "dem" ? "D" : "R") : null;
+  };
+  // who holds the Senate on these counts: the larger side; at 50–50 the VP's party (if known)
+  const senateControl = (c, y) => (c.D > c.R ? "D" : c.R > c.D ? "R" : c.D === 50 ? tieBreaker(y) : null);
+  // tonight: control secured by certain seats only (not up or called): 51, or 50 with the VP
+  const senateSecured = (s, y) => {
+    const vp = tieBreaker(y), has = p => s[p] >= 51 || (s[p] >= 50 && vp === p);
+    return has("D") ? "D" : has("R") ? "R" : null;
+  };
   const senateNeed = vp => `51 for control${vp ? ` (50 for ${{ D: "Democrats", R: "Republicans" }[vp]})` : ""}`;
   function senateSeatsBody(y) {
     const c = extra.senate.control[y], rs = sYear(y);
@@ -1382,7 +1392,7 @@
     const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
     for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
       lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
-    return `${tugBar(t, 100, senateNeed(SENATE_VP[y]), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>`;
+    return `${tugBar(t, 100, senateNeed(tieBreaker(y)), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>`;
   }
   function houseSeatsBody(y) {
     const c = extra.house.seats[y];
@@ -1666,7 +1676,7 @@
           c = sen ? extra.senate.control[y] : extra.house.seats[y];
           pop = sen ? senatePopular(y) : extra.house.popular[y];
         }
-        const ctl = sen ? (y === LIVE_YEAR ? (c.D > c.R ? "D" : c.R >= 50 ? "R" : null) : senateControl(c, y)) : c.D >= 218 ? "D" : c.R >= 218 ? "R" : c.D > c.R ? "D" : c.R > c.D ? "R" : null;
+        const ctl = sen ? senateControl(c, y) : c.D >= 218 ? "D" : c.R >= 218 ? "R" : c.D > c.R ? "D" : c.R > c.D ? "R" : null;
         pts.push({ y, live: y === LIVE_YEAR, who: CAUCUS_NAME[ctl] ?? (sen ? "Tied" : "No majority"), lean: seatSpan(c, ctl),
           ...(seatsChart ? seatBar(c, ctl, sen ? 100 : 435) : popBar(pop)) });
       }
@@ -1956,7 +1966,7 @@
     for (const p of ["D", "R", "I"]) t[p] = { solid: b[p].notUp + b[p].called, lead: b[p].leading, solidText: "Not up or won",
       lines: [`${b[p].notUp} not up`, `${b[p].called} won`, `${b[p].leading} leading`] };
     const changed = (notUp.seats || []).filter(x => x.note);
-    return `${tugBar(t, 100, senateNeed("R"), liveRaces("senate"), "seats", "", t.D.solid >= 51 ? "D" : t.R.solid >= 50 ? "R" : null)}
+    return `${tugBar(t, 100, senateNeed(tieBreaker(LIVE_YEAR)), liveRaces("senate"), "seats", "", senateSecured({ D: t.D.solid, R: t.R.solid }, LIVE_YEAR))}
       ${changed.length ? `<ul class="notes"><li>Seats not up held by someone other than that race's winner: ${changed.map(x => x.note).join(" ")}</li></ul>` : ""}
       ${popSection(senatePopular(null, liveRaces("senate")), true)}<p class="note">${SENATE_POP_NOTE.replace("this year's", "tonight's")}</p>`;
   }
