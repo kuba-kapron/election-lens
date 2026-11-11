@@ -34,12 +34,15 @@ US presidential results 2000–2024 on one static page (`web/`):
   kind in a year will be labeled "2019 Apr".
 - Country selector next to the wordmark: flag (SVG in a 24×16 box at its own proportions, the
   outline drawn over its edge; each flag SVG needs width and height) and name; one country for
-  now. US flag drawn to the official proportions, colors from the DDD-F-416E version.
+  now. US flag drawn to the official proportions, colors from the DDD-F-416E version. The flag
+  also sits in every results card's top-right corner and starts the breadcrumb.
 - City names on the map (added November 3, 2026): the largest metros for the whole country,
   more as you zoom in; the selected state's cities first, neighbors in grey; a name goes right
   of its dot, else left, below or above, never over another name, and avoids covering other
   cities' dots; same screen size at every zoom and screen width. Alaska and Hawaii cities show
-  only for the country or their own state (their insets sit near other states).
+  only for the country or their own state (their insets sit near other states). Three sizes by
+  metro population (3M+, 500k+, smaller); Washington with a star, state capitals with a ring (a
+  selected state's capital always gets a name when there is room).
 - Shareable links: `#year=2024&view=shift&map=counties&color=margin&arrows=on&place=48201`.
   Defaults are left out of the link; old `#2024/margin/48201` and `vote=popular` (opens
   Margin) links still work.

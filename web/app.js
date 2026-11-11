@@ -183,8 +183,11 @@
   }
   // where the map is: "United States › Ohio › Franklin County"; each level above is a link
   const crumbsEl = document.getElementById("crumbs");
+  // the country in view: its flag in the panel's corner and at the start of the breadcrumb
+  const COUNTRY = { name: "United States", flag: "img/flags/us.svg?v=2" };
+  const flagBox = () => `<span class="flag-box"><span class="flag-frame"><img class="flag" src="${COUNTRY.flag}" alt=""></span></span>`;
   function drawCrumbs() {
-    const sel = state.sel, st = stateOf(sel), parts = [[{ type: "nation" }, "United States"]];
+    const sel = state.sel, st = stateOf(sel), parts = [[{ type: "nation" }, `${flagBox()}${COUNTRY.name}`]];
     if (st) parts.push([{ type: "state", id: st }, data.states[st].name]);
     if (sel.type === "county" && !SINGLE.has(st)) parts.push([sel, data.counties[sel.id]?.name ?? "Unknown"]);
     if (sel.type === "district" && !atLarge(st)) parts.push([sel, `${districtName(sel.id, true)} district`]);
@@ -195,7 +198,8 @@
   }
   function headline(office, sel, where, special = false) {
     const k = sel.type === "nation" && office === "governor" ? "Governors" : OFFICE_HEAD[office];
-    return `<p class="kicker">${k}${special ? " · special election" : ""}</p><h2>${placeName(sel)}</h2><p class="where">${where}</p>`;
+    // the country's flag sits in the card's top-right corner, level with this line
+    return `<p class="kicker"><span>${k}${special ? " · special election" : ""}</span><span class="kicker-flag" title="${COUNTRY.name}">${flagBox()}</span></p><h2>${placeName(sel)}</h2><p class="where">${where}</p>`;
   }
   const liveWhen = () => { const u = liveFile()?.updated; return `2026 · live${u ? `, updated ${clock(u)}` : ""}`; };
   function stateOf(sel) { return sel.type === "county" || sel.type === "district" ? sel.id.slice(0, 2) : sel.type === "state" ? sel.id : null; }

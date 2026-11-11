@@ -333,7 +333,7 @@ h1 {
 
 .combo { position: relative; margin-left: auto; width: 220px; }
 /* breadcrumb above the map: United States › Ohio › Franklin County */
-.crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; margin: 0 0 6px; font-size: 14px; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin: 0 0 6px; font-size: 14px; }
 .crumbs .quiet { padding: 2px 0; }
 .crumbs .sep { color: var(--muted); }
 .crumbs [aria-current] { font-weight: 700; }
@@ -507,6 +507,10 @@ h1 {
 .panel .where { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 /* the office, above the place name */
 .panel p.kicker { margin: 0 0 2px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2; }
+.panel p.kicker { display: flex; align-items: center; gap: 12px; }
+.panel .kicker-flag { margin-left: auto; display: inline-flex; }
+/* the breadcrumb's first step: flag and country name */
+.crumbs button, .crumbs [aria-current] { display: inline-flex; align-items: center; gap: 6px; }
 
 .panel h3, .races h3 {
   margin: 22px 0 8px;
