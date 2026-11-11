@@ -2,7 +2,8 @@
 # City labels for the map -> web/data/places.json: US cities from Natural Earth's populated
 # places (public domain; fetched by fetch_data.sh), projected like the map shapes (Albers USA,
 # Alaska and Hawaii as insets, same as build_geo.sh) so they land in the right county.
-# Each city: [name, state FIPS, population (metro, Natural Earth's pop_max), x, y], largest first.
+# Each city: [name, state FIPS, population (metro, Natural Earth's pop_max), x, y, capital], largest
+# first; capital: 2 = national (Washington), 1 = state capital, 0 = neither (Natural Earth's featurecla).
 # Needs: mapshaper.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -10,7 +11,7 @@ cd "$(dirname "$0")/.."
 TMP=$(mktemp -d)
 mapshaper data/raw/places/ne_10m_populated_places_simple.shp \
   -filter "adm0_a3 == 'USA'" \
-  -filter-fields name,adm1name,pop_max \
+  -filter-fields name,adm1name,pop_max,featurecla \
   -proj albersusa \
   -o "$TMP/places.json" format=geojson
 
@@ -25,7 +26,8 @@ for f in json.load(open(sys.argv[1]))["features"]:
     if not st or not g:
         continue
     x, y = g["coordinates"]
-    out.append([" ".join(p["name"].split()), st, int(p["pop_max"]), round(x), round(y)])
+    cap = 2 if p["featurecla"].startswith("Admin-0 capital") else 1 if p["featurecla"].startswith("Admin-1 capital") else 0
+    out.append([" ".join(p["name"].split()), st, int(p["pop_max"]), round(x), round(y), cap])
 out.sort(key=lambda c: -c[2])
 open(sys.argv[2], "w").write(json.dumps(out, separators=(",", ":"), ensure_ascii=False) + "\n")
 print(f"{len(out)} cities -> {sys.argv[2]}")

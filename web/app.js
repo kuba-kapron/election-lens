@@ -353,8 +353,12 @@
   // Which cities get a name depends on the zoom: the largest metros for the whole country,
   // more as you zoom in. Largest first; a name that would overlap one already placed is left
   // out. Sizes are in screen pixels: the map's own units are scaled down on narrow screens.
+  // Three sizes by metro population (name and dot), and capitals marked as in an atlas: a star
+  // for Washington, a ring for state capitals (a selected state's capital always shows).
+  const placeTier = pop => (pop >= 3e6 ? 0 : pop >= 5e5 ? 1 : 2);
+  const PLACE_FS = [13, 11, 10], PLACE_R = [3.2, 2.4, 1.9];
   let places = [];
-  d3.json("data/places.json").then(d => { places = d.map(([name, st, pop, x, y]) => ({ name, st, pop, p: projection([x, y]) })); drawPlaces(); })
+  d3.json("data/places.json?v=2").then(d => { places = d.map(([name, st, pop, x, y, cap]) => ({ name, st, pop, cap: cap || 0, tier: placeTier(pop), p: projection([x, y]) })); drawPlaces(); })
     .catch(() => { /* no labels */ });
   const placeScale = () => W / (svg.node().getBoundingClientRect().width || W);  // map units per screen pixel
   function drawPlaces() {
@@ -362,7 +366,7 @@
     const t = d3.zoomTransform(svg.node()), s = placeScale();
     gPlaces.style("--inv", s / t.k);
     const minPop = t.k < 1.5 ? 2.5e6 : t.k < 3 ? 4e5 : t.k < 8 ? 6e4 : 0;
-    const max = t.k < 1.5 ? 10 : 18, fs = 11, placed = [], shown = [];
+    const max = t.k < 1.5 ? 10 : 18, placed = [], shown = [];
     // the selected state's cities first; neighbors after, in a quieter grey; Alaska and Hawaii
     // are insets that sit near other states, so their cities show only for themselves or the country
     const st = state.sel.type === "nation" ? null : stateOf(state.sel);
@@ -372,7 +376,7 @@
     for (const c of order) {
       if (cands.length >= 60) break;
       const own = c.st === st;
-      if (c.pop < minPop && !(own && c.pop >= minPop / 4)) continue;
+      if (c.pop < minPop && !(own && (c.pop >= minPop / 4 || c.cap))) continue;
       if ((c.st === "02" || c.st === "15") && st && !own) continue;
       const [sx, sy] = t.apply(c.p);
       if (sx < 0 || sy < 0 || sx > W || sy > H) continue;
@@ -383,7 +387,7 @@
     for (const { c, sx, sy, own } of cands) {
       if (shown.length >= max) break;
       // label boxes in map-view units (screen pixels times s): right of the dot, else left, below, above
-      const tw = (c.name.length * fs * 0.58 + 5) * s, bh = (fs + 3) * s, d = 3 * s;
+      const fs = PLACE_FS[c.tier], tw = (c.name.length * fs * (c.tier ? 0.58 : 0.62) + 5) * s, bh = (fs + 3) * s, d = (PLACE_R[c.tier] + 1) * s;
       const sides = [
         ["r", [sx - d, sy - bh / 2, sx + tw + d, sy + bh / 2]],
         ["l", [sx - tw - d, sy - bh / 2, sx + d, sy + bh / 2]],
@@ -402,16 +406,23 @@
       .join(enter => {
         const e = enter.append("g").attr("class", "place").attr("transform", c => `translate(${c.p[0]},${c.p[1]})`);
         const inner = e.append("g").attr("class", "place-in");
-        inner.append("circle").attr("r", 2.4);
-        inner.append("text").text(c => c.name);
+        // Washington: a star; a state capital: a ring; other cities: a dot sized by population
+        inner.append("path").attr("class", c => (c.cap === 2 ? "mark star" : c.cap ? "mark ring" : "mark"))
+          .attr("d", c => (c.cap === 2 ? starPath(4.6) : circlePath(c.cap ? 3 : PLACE_R[c.tier])));
+        inner.append("text").attr("class", c => `t${c.tier}`).text(c => c.name);
         return e;
       })
       .classed("other", c => c.other)
       .call(sel => sel.select("text")
-        .attr("x", c => (c.side === "r" ? 5 : c.side === "l" ? -5 : 0))
-        .attr("y", c => (c.side === "b" ? 9 : c.side === "t" ? -9 : 0))
+        .attr("x", c => { const g = PLACE_R[c.tier] + 3; return c.side === "r" ? g : c.side === "l" ? -g : 0; })
+        .attr("y", c => { const g = PLACE_FS[c.tier] / 2 + PLACE_R[c.tier] + 2; return c.side === "b" ? g : c.side === "t" ? -g : 0; })
         .attr("dy", "0.35em")
         .attr("text-anchor", c => (c.side === "r" ? "start" : c.side === "l" ? "end" : "middle")));
+  }
+  const circlePath = r => `M${-r},0a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`;
+  function starPath(r) {
+    const pts = d3.range(10).map(k => { const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? r * 0.42 : r; return `${(q * Math.cos(a)).toFixed(2)},${(q * Math.sin(a)).toFixed(2)}`; });
+    return `M${pts.join("L")}Z`;
   }
   window.addEventListener("resize", () => { drawPlaces(); sizeStripes(); });
 
