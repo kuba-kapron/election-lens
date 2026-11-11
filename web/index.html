@@ -63,6 +63,10 @@
           <button type="button" role="radio" aria-checked="true" data-cmap="winner" title="Solid once a race is won or called; stripes where the seat changed party">Winner</button>
           <button type="button" role="radio" aria-checked="false" data-cmap="margin" title="Every race shaded by its margin">Margin</button>
         </div>
+        <div class="mode" role="radiogroup" aria-label="Round" id="round-toggle" hidden>
+          <button type="button" role="radio" aria-checked="false" data-round="november" title="Every race as counted in November: races that went to a runoff or a ranked-choice count had no winner yet">November</button>
+          <button type="button" role="radio" aria-checked="true" data-round="final" title="Every race as it was decided: runoffs and ranked-choice counts included">Final</button>
+        </div>
       </div>
       <nav class="crumbs" id="crumbs" aria-label="Where the map is"></nav>
       <svg id="map" role="img" aria-label="Map of US counties colored by result"></svg>

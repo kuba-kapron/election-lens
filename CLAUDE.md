@@ -133,9 +133,14 @@ Decided with the owner:
 - No Shift view for Senate and House yet: the same Senate seat is up every
   6 years and House districts were redrawn for 2022 (and some for 2024). Revisit later by
   looking at what TV networks do.
-- Runoffs and ranked-choice: the deciding round (Georgia runoffs, final RCV round) colors
-  the map and decides the winner; the panel also shows the first round. Where the final
-  round exists only statewide/district-wide, counties show the first round, labeled.
+- Runoffs and ranked-choice (decided November 11, 2026): a map-wide **November | Final**
+  control in the map tools (only in years where some race had more rounds). Final (default):
+  the deciding round colors the map and decides the winner. November: every race at its
+  November count; races that went on show who advanced (→, bold, Runoff grey on the Winner
+  map, or the party when all who advanced share it). Where the final round exists only
+  statewide/district-wide, counties show the first round, labeled. Countries with a second
+  round everywhere (Poland's presidential, France's parliamentary) will use the same control
+  ("Round 1 | Round 2").
 - Independents are colored by caucus: King and Sanders in Democratic blue (noted as
   independents who caucus with Democrats); Osborn and McMullin in purple (`--ind`, also used
   for other small parties). Greens are green and Libertarians gold, matching their icons.
