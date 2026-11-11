@@ -9,7 +9,7 @@
 # Shapes are projected to Albers USA (Alaska and Hawaii as insets) and simplified.
 # Needs: mapshaper (npm i -g mapshaper), and data/raw/ filled by fetch_data.sh.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 RAW=data/raw
 C2019=$RAW/c2019/cb_2019_us_county_500k.shp

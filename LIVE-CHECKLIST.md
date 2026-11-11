@@ -10,7 +10,7 @@ Times are Warsaw time (CET).
    then open http://localhost:8000/#race=senate&year=2026 in the browser
    (the governor races are under Governor).
 3. Window 2, the importer:
-   `uv run pipeline/live.py`
+   `uv run -m pipeline.us.live.importer`
    It prints one line per race every minute: source, % counted, top two.
    Stop it with Ctrl+C.
 4. Check that the page says "updated" with the current time and has no "Test data" label.
@@ -73,8 +73,8 @@ per round ("435 races, N with votes"). Louisiana's House vote tonight is a prima
 Use this when a race has no working source, or a source looks wrong:
 
 ```
-uv run pipeline/live_manual.py set MI-sen El-Sayed=1234567 Rogers=1200345 --pct 45 --source "AP via NBC News"
-uv run pipeline/live_manual.py clear MI-sen          # back to automatic
+uv run -m pipeline.us.live.manual set MI-sen El-Sayed=1234567 Rogers=1200345 --pct 45 --source "AP via NBC News"
+uv run -m pipeline.us.live.manual clear MI-sen          # back to automatic
 ```
 
 Race ids: the two-letter state plus "-sen" (e.g. MI-sen, NH-sen), and OH-gov, TX-gov. The page shows the source you type.
@@ -84,9 +84,9 @@ Race ids: the two-letter state plus "-sen" (e.g. MI-sen, NH-sen), and OH-gov, TX
 The page never calls a race itself. When a news organization calls one:
 
 ```
-uv run pipeline/live_manual.py call XX-sen Lastname --by AP
-uv run pipeline/live_manual.py call XX-3 Lastname --by AP     # House district (XX-AL at large)
-uv run pipeline/live_manual.py uncall XX-sen                  # if it was a mistake
+uv run -m pipeline.us.live.manual call XX-sen Lastname --by AP
+uv run -m pipeline.us.live.manual call XX-3 Lastname --by AP     # House district (XX-AL at large)
+uv run -m pipeline.us.live.manual uncall XX-sen                  # if it was a mistake
 ```
 
 XX is the state code and Lastname the candidate's last name as the page shows it. Never copy a

@@ -1,6 +1,6 @@
 """Build web/data/senate.json: US Senate results 2020-2024, statewide and by county.
 
-Sources (see pipeline/congress.py for links):
+Sources (see pipeline/us/congress/sources.py for links):
   Statewide 2020, 2022  FEC "Federal Elections" (certified), checked against the Clerk of the
                         House statistics and MEDSL's statewide file
   Statewide 2024        MEDSL "U.S. Senate statewide 1976-2024", checked against the Clerk
@@ -9,7 +9,7 @@ Sources (see pipeline/congress.py for links):
   Senate control        computed from the winners of the last three elections (2016 and 2018
                         winners from MEDSL) and checked against the Senate's party division
 
-Run pipeline/fetch_congress.sh first. Every disagreement between sources is printed; one
+Run pipeline/us/congress/fetch_congress.sh first. Every disagreement between sources is printed; one
 above 0.1% for a leading candidate stops the build unless it is explained in KNOWN_DIFFS.
 
 Output shape:
@@ -33,8 +33,8 @@ import json
 import re
 from collections import defaultdict
 
-import congress as C
-from build_results import norm_fips
+from pipeline.us.congress import sources as C
+from pipeline.us.states import norm_fips
 
 OUT = C.ROOT / "web" / "data" / "senate.json"
 YEARS = [2020, 2022, 2024]

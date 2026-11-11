@@ -4,7 +4,7 @@ Each race lists its sources in order of preference: the state's official results
 civicAPI (unofficial, civicapi.org) as the fallback. Louisiana's robots.txt does not allow
 scripts on its results data, Ohio's and Michigan's sites block scripts, Georgia's 2026
 results were not published yet, and Mississippi and Maine have no statewide live results,
-so those races start on civicAPI. Manual entries (pipeline/live_manual.py) override both.
+so those races start on civicAPI. Manual entries (pipeline/us/live/manual.py) override both.
 The other 25 Senate races (added later on November 3) use civicAPI only.
 
 Poll closing times: CBS News, "Here's when polls open and close for 2026 midterm elections"
@@ -302,7 +302,7 @@ def close_times(st):
 # Wikipedia, "2025–2026 United States redistricting").
 HOUSE_SEARCH = "https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives&election_date=2026-11-03&limit=1000"
 # One state at a time: on election night the all-states list (700 KB) failed with 502s while
-# a single state's (15 KB, about 30 s) came through; pipeline/live.py asks a few per round.
+# a single state's (15 KB, about 30 s) came through; pipeline/us/live/importer.py asks a few per round.
 HOUSE_STATE_SEARCH = ("https://civicapi.org/api/v2/race/search?type=House%20of%20Representatives"
                       "&province={st}&election_date=2026-11-03&limit=60")
 HOUSE_NOTES = {"LA": "Louisiana's House vote on November 3 is a primary with every candidate on one ballot; "

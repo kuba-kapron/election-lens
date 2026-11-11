@@ -1,6 +1,6 @@
-"""Readers for each live results source. All requests go through live_fetch (polite fetching).
+"""Readers for each live results source. All requests go through pipeline/common/fetch.py (polite fetching).
 
-Every reader returns a Reading, or raises live_fetch.Refused / ValueError when it has
+Every reader returns a Reading, or raises fetch.Refused / ValueError when it has
 nothing usable:
 
     names, parties  as the source writes them
@@ -23,9 +23,9 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import live_fetch as F
+from pipeline.common import fetch as F
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 ABBR_TO_FIPS = {s["abbr"]: fips for fips, s in json.loads((ROOT / "web/data/results.json").read_text())["states"].items()}
 
 
@@ -248,7 +248,7 @@ def read_ev(race, src):
     looked up in the election data every time."""
     import tempfile
     import urllib.parse
-    import xlsx
+    from pipeline.common import xlsx
     site, jur, eid = src["site"], src["jurisdiction"], src["election"]
     office = re.compile(src["office"], re.I) if src.get("office") else SENATE
     d = json.loads(F.fetch(f"{site}/results/public/api/elections/{jur}/{eid}"))

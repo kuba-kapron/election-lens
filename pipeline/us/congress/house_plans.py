@@ -5,7 +5,7 @@ the same district numbers and every district keeps its area (within 1%) and its 
 (within 2 km). Census files of different years draw the same unchanged line with slightly
 different points, so lines are compared by shape, not point by point.
 
-    python3 pipeline/house_plans.py <dir with d2020.json, d2022.json, ...> <out plans.json> 2020 2022 2024 2026
+    python3 -m pipeline.us.congress.house_plans <dir with d2020.json, d2022.json, ...> <out plans.json> 2020 2022 2024 2026
 
 Writes plans.json: for each year, the year whose map each state uses ({"2026": {"56": 2020,
 ...}}), and <dir>/new_<year>.txt, the states with a new map that year, as a list mapshaper's

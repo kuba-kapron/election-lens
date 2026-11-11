@@ -11,7 +11,7 @@ files here by hand.
    - `photos/trump.jpg` is used for every year that candidate ran.
    - `photos/trump-2024.jpg` is used only for 2024 and takes priority over the general one.
    - `photos/trump-2016-2020.jpg` is used for both 2016 and 2020 (list as many years as needed).
-2. Run `uv run pipeline/build_photos.py` from the repository root. It crops each photo to a
+2. Run `uv run -m pipeline.us.photos.build_photos` from the repository root. It crops each photo to a
    square around the upper part of the picture, shrinks it to 128 × 128 pixels (a few KB)
    and saves it here as `<name>.jpg`.
    - Add `--delete-originals` to delete each original from `photos/` once its portrait is

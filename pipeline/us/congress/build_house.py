@@ -1,12 +1,12 @@
 """Build web/data/house.json: US House results 2020-2024 by congressional district.
 
-Sources (see pipeline/congress.py for links):
+Sources (see pipeline/us/congress/sources.py for links):
   2020, 2022  FEC "Federal Elections" (certified), checked against the Clerk of the House
               statistics
   2024        Clerk of the House statistics (certified), checked against MEDSL's House
               precinct returns summed by district; names and incumbents from the FEC
               2024 ballot list
-District shapes come from pipeline/build_house_geo.sh (web/data/house/<year>.json).
+District shapes come from pipeline/us/congress/build_house_geo.sh (web/data/house/<year>.json).
 
 Every disagreement between sources is printed. One above 0.1% for a leading candidate
 (between official sources), or a different winner (against MEDSL), stops the build unless
@@ -30,8 +30,8 @@ import json
 import re
 from collections import defaultdict
 
-import congress as C
-from build_senate import ELECTION_DAY, NAMES, caucus_of, display_name, party_code
+from pipeline.us.congress import sources as C
+from pipeline.us.congress.build_senate import ELECTION_DAY, NAMES, caucus_of, display_name, party_code
 
 OUT = C.ROOT / "web" / "data" / "house.json"
 YEARS = [2020, 2022, 2024]

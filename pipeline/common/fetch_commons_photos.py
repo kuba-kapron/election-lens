@@ -1,12 +1,12 @@
 """Download the candidate photos the owner approved from the review sheet made by
-pipeline/find_commons_photos.py (all 14 free-licensed photos were approved on November 3, 2026).
+pipeline/us/photos/find_commons_photos.py (all 14 free-licensed photos were approved on November 3, 2026).
 
-    uv run pipeline/fetch_commons_photos.py            # every photo marked "needs your approval"
-    uv run pipeline/fetch_commons_photos.py nc-cooper  # only these keys
+    uv run -m pipeline.common.fetch_commons_photos            # every photo marked "needs your approval"
+    uv run -m pipeline.common.fetch_commons_photos nc-cooper  # only these keys
 
 Saves each photo (Commons' 960-pixel version) to photos/people/<key>.jpg (not committed)
 and its credit (author, license, Commons page) to photos/people/credits.json. Then run
-pipeline/build_photos.py, which shrinks them into web/img/people/ for the page.
+pipeline/us/photos/build_photos.py, which shrinks them into web/img/people/ for the page.
 """
 
 import json
@@ -14,9 +14,9 @@ import sys
 import time
 from pathlib import Path
 
-import live_fetch as F
+from pipeline.common import fetch as F
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "data" / "raw" / "people" / "candidates.json"
 OUT = ROOT / "photos" / "people"
 
@@ -43,7 +43,7 @@ def main():
             print(f"  {r['key']:16} {len(data) // 1024:4} KB  {r['license']}, {r['author']}")
         credits[r["key"]] = credit
         credits_path.write_text(json.dumps(credits, indent=2, ensure_ascii=False) + "\n")  # saved as we go
-    print(f"{len(credits)} photos with credits in {credits_path.relative_to(ROOT)}; now run pipeline/build_photos.py")
+    print(f"{len(credits)} photos with credits in {credits_path.relative_to(ROOT)}; now run pipeline/us/photos/build_photos.py")
     return 0
 
 

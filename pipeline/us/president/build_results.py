@@ -6,7 +6,7 @@ Sources:
   2020-2024  Tony McGovern, county results (MIT license)
              https://github.com/tonmcg/US_County_Level_Election_Results_08-24
              (unofficial counts; within ~0.1% of the certified national totals)
-Run pipeline/fetch_data.sh first. Uses only the Python standard library.
+Run pipeline/us/president/fetch_data.sh first. Uses only the Python standard library.
 
 Output shape (votes are [democratic, republican, total]):
 {
@@ -36,7 +36,9 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from pipeline.us.states import STATES, norm_fips
+
+ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "data" / "raw" / "tonmcg"
 MEDSL = ROOT / "data" / "raw" / "medsl" / "countypres_2000-2016.csv"
 OUT = ROOT / "web" / "data" / "results.json"
@@ -51,26 +53,6 @@ CANDIDATES = {
     2016: {"dem": "Clinton", "gop": "Trump", "won": "gop"},
     2020: {"dem": "Biden", "gop": "Trump", "won": "dem"},
     2024: {"dem": "Harris", "gop": "Trump", "won": "gop"},
-}
-
-STATES = {
-    "01": ("Alabama", "AL"), "02": ("Alaska", "AK"), "04": ("Arizona", "AZ"),
-    "05": ("Arkansas", "AR"), "06": ("California", "CA"), "08": ("Colorado", "CO"),
-    "09": ("Connecticut", "CT"), "10": ("Delaware", "DE"), "11": ("District of Columbia", "DC"),
-    "12": ("Florida", "FL"), "13": ("Georgia", "GA"), "15": ("Hawaii", "HI"),
-    "16": ("Idaho", "ID"), "17": ("Illinois", "IL"), "18": ("Indiana", "IN"),
-    "19": ("Iowa", "IA"), "20": ("Kansas", "KS"), "21": ("Kentucky", "KY"),
-    "22": ("Louisiana", "LA"), "23": ("Maine", "ME"), "24": ("Maryland", "MD"),
-    "25": ("Massachusetts", "MA"), "26": ("Michigan", "MI"), "27": ("Minnesota", "MN"),
-    "28": ("Mississippi", "MS"), "29": ("Missouri", "MO"), "30": ("Montana", "MT"),
-    "31": ("Nebraska", "NE"), "32": ("Nevada", "NV"), "33": ("New Hampshire", "NH"),
-    "34": ("New Jersey", "NJ"), "35": ("New Mexico", "NM"), "36": ("New York", "NY"),
-    "37": ("North Carolina", "NC"), "38": ("North Dakota", "ND"), "39": ("Ohio", "OH"),
-    "40": ("Oklahoma", "OK"), "41": ("Oregon", "OR"), "42": ("Pennsylvania", "PA"),
-    "44": ("Rhode Island", "RI"), "45": ("South Carolina", "SC"), "46": ("South Dakota", "SD"),
-    "47": ("Tennessee", "TN"), "48": ("Texas", "TX"), "49": ("Utah", "UT"),
-    "50": ("Vermont", "VT"), "51": ("Virginia", "VA"), "53": ("Washington", "WA"),
-    "54": ("West Virginia", "WV"), "55": ("Wisconsin", "WI"), "56": ("Wyoming", "WY"),
 }
 
 # Full names for the side panel, in the short form each candidate is commonly known by
@@ -180,26 +162,10 @@ def electoral(states):
     return out
 
 
-# County codes that changed before the 2019 boundary files used for the map.
-FIPS_FIXES = {
-    "46113": "46102",  # Shannon County SD renamed Oglala Lakota County (2015)
-    "51515": "51019",  # Bedford city VA merged into Bedford County (2013)
-}
-
-
 def num(value):
     """Parse a vote count like '1234', '1234.0' or '1,234'; empty -> None."""
     value = (value or "").replace(",", "").strip()
     return int(float(value)) if value else None
-
-
-def norm_fips(raw):
-    fips = str(raw).strip().split(".")[0].zfill(5)
-    if fips.startswith("02"):
-        return "02000"  # Alaska: one statewide unit
-    if fips.startswith("11"):
-        return "11001"  # DC: wards summed into the district
-    return FIPS_FIXES.get(fips, fips)
 
 
 def main():

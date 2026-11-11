@@ -60,28 +60,38 @@ US presidential results 2000–2024 on one static page (`web/`):
 ## Layout
 
 ```
-pipeline/fetch_data.sh       raw sources -> data/raw/ (gitignored)
-pipeline/build_geo.sh        county shapes -> web/data/geo.json (needs mapshaper)
-pipeline/build_results.py    results + electoral votes -> web/data/results.json (stdlib only)
-pipeline/build_places.sh    Natural Earth populated places -> web/data/places.json (city labels:
-                             US cities projected like the map, largest first; mapshaper)
-pipeline/build_photos.py     photos/ originals -> web/img/candidates/*.jpg + photos.json;
-                             photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
-pipeline/fetch_congress.sh   FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
-pipeline/fetch_portraits.py  official portraits of candidates who served -> photos/congress/
-pipeline/build_house_geo.sh  district shapes -> web/data/house/plans-<year>.json + plans.json:
-                             each state's map stored once (the year it first appeared), the
-                             index says which file each state uses per election (mapshaper;
-                             changed states measured by pipeline/house_plans.py)
-pipeline/build_senate.py     -> web/data/senate.json (statewide, counties, seat history)
-pipeline/build_house.py      -> web/data/house.json (435 districts per year)
-pipeline/fetch_governor.sh   MEDSL precinct returns 2018, 2022, 2024 -> data/raw/governor/
-pipeline/build_governor.py   -> web/data/governor.json (statewide governor results per year)
-pipeline/publish.sh          upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
-pipeline/congress.py, xlsx.py  shared readers: FEC spreadsheets, Clerk PDF text (pypdf)
+pipeline/                        run from the repository root: `uv run -m pipeline.<path>.<script>`
+                                 for Python (`pipeline.us.live.manual`), `./pipeline/...sh` for shell
+  common/fetch.py                polite fetching: every request goes through it
+  common/xlsx.py                 Excel reader (stdlib only)
+  common/trail.py                race charts through the night (no country rules)
+  common/fetch_commons_photos.py download Commons photos the owner approved, with credits
+  us/                            everything specific to the United States (pl/ for Poland later)
+  us/states.py                   state codes, county code fixes (norm_fips)
+  us/president/fetch_data.sh     raw sources -> data/raw/ (gitignored)
+  us/president/build_geo.sh      county shapes -> web/data/geo.json (needs mapshaper)
+  us/president/build_results.py  results + electoral votes -> web/data/results.json (stdlib only)
+  us/president/build_places.sh   Natural Earth populated places -> web/data/places.json (city
+                                 labels: US cities projected like the map, largest first; mapshaper)
+  us/congress/fetch_congress.sh  FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
+  us/congress/sources.py         shared readers: FEC spreadsheets, Clerk PDF text (pypdf), member IDs
+  us/congress/build_house_geo.sh district shapes -> web/data/house/plans-<year>.json + plans.json:
+                                 each state's map stored once (the year it first appeared), the
+                                 index says which file each state uses per election (mapshaper;
+                                 changed states measured by us/congress/house_plans.py)
+  us/congress/build_senate.py    -> web/data/senate.json (statewide, counties, seat history)
+  us/congress/build_house.py     -> web/data/house.json (435 districts per year)
+  us/governor/fetch_governor.sh  MEDSL precinct returns 2018, 2022, 2024 -> data/raw/governor/
+  us/governor/build_governor.py  -> web/data/governor.json (statewide governor results per year)
+  us/photos/build_photos.py      photos/ originals -> web/img/candidates/*.jpg + photos.json;
+                                 photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
+  us/photos/fetch_portraits.py   official portraits of candidates who served -> photos/congress/
+  us/photos/find_commons_photos.py  Wikimedia Commons photos for US candidates: review sheet (see Live)
+  us/live/                       election night, see "Live results" below
+  publish.sh                     upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
 web/index.html, app.js, style.css   the page; plain JS + D3 v7, no build step
-web/vendor/                  D3, topojson-client, Public Sans (vendored, licenses in README there)
-photos/                      original candidate photos (gitignored)
+web/vendor/                      D3, topojson-client, Public Sans (vendored, licenses in README there)
+photos/                          original candidate photos (gitignored)
 ```
 
 Run: `cd web && uv run python -m http.server 8000`. Python is managed with uv (pinned 3.14).
@@ -163,15 +173,15 @@ races were added the same day, from civicAPI only. Poll closing times: CBS News.
 (`#race=senate&year=2026`; old `#race=live` links still open it).
 
 ```
-pipeline/live_races.py   the 37 races: candidates, poll closing times, sources in order
-pipeline/live_sources.py readers: NC (precinct zip), Clarity (SC, IA: JSON + county XML),
-                         FL (county extract), TX (statewide HTML), Enhanced Voting (GA, VA,
-                         RI: Excel/CSV report), DE (JSON), SD (CSV), OR (page), civicAPI
-pipeline/live_fetch.py   polite fetching: every request goes through it
-pipeline/live.py         importer loop -> web/data/live/{senate,governor,house}.json (not
-                         committed); --replay to test
-pipeline/live_manual.py  numbers or race calls typed in by hand -> data/live/ (not committed)
-LIVE-CHECKLIST.md        what to run and watch on election night
+pipeline/us/live/races.py    the 37 races: candidates, poll closing times, sources in order
+pipeline/us/live/sources.py  readers: NC (precinct zip), Clarity (SC, IA: JSON + county XML),
+                             FL (county extract), TX (statewide HTML), Enhanced Voting (GA, VA,
+                             RI: Excel/CSV report), DE (JSON), SD (CSV), OR (page), civicAPI
+pipeline/common/fetch.py     polite fetching: every request goes through it
+pipeline/us/live/importer.py importer loop -> web/data/live/{senate,governor,house}.json (not
+                             committed); --replay to test
+pipeline/us/live/manual.py   numbers or race calls typed in by hand -> data/live/ (not committed)
+LIVE-CHECKLIST.md            what to run and watch on election night
 ```
 
 Rules agreed with the owner:
@@ -214,7 +224,7 @@ Rules agreed with the owner:
   (Vice President Vance breaks ties).
 - House (added November 3): all 435 races from one civicAPI request per round (its race search,
   type "House of Representatives"), then official results replace them district by district
-  for 16 states (pipeline/live_house.py: NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT
+  for 16 states (pipeline/us/live/house.py: NC, SC, IA, FL, TX, GA, VA, OR, NY, DE, SD, MD, UT
   from the files already read for Senate/governor; WA, IN, ND for the House only; 182
   districts). Utah's and Washington's Enhanced Voting reports are named "All Results Excel" /
   sheet "Summary Results" and list over/under votes as choices (skipped); Washington moved to
@@ -241,7 +251,7 @@ Rules agreed with the owner:
   The Senate file also has "not_up" (the balance); "night" (any votes yet, Senate calls) is
   repeated in every file for the year ribbon.
 - Race charts ("Through the night", added November 3): web/data/live/trail-<office>.json, built by
-  pipeline/live_trail.py from the snapshots when the importer starts (a restart loses nothing)
+  pipeline/common/trail.py from the snapshots when the importer starts (a restart loses nothing)
   and extended every round. Per race: candidates in first-seen order, sources, and points
   [unix time, % counted, total, source index, votes...], added only when the numbers change and
   once there are votes. Votes, not margins; numbers as reported. The page loads a chart file only
@@ -288,10 +298,9 @@ owner downloads it). Still to do: check every race against its state's certified
 FEC-style national source; New York 2018 is about 350,000 short for Cuomo), then governor
 pages for past years. Even years only for now (2021/2023 odd-year races later).
 
-Also after election night: tidy pipeline/ into topic folders (common/ with the polite fetcher,
-xlsx and state codes; president/, congress/, photos/, live/), run as `uv run -m pipeline.<topic>.<script>`;
-check that every build's output is byte-for-byte unchanged. Agreed November 3, 2026, postponed so
-tonight's tested live scripts and checklist stay as they are.
+pipeline/ was sorted into folders on November 11, 2026 (agreed November 3, postponed past election
+night): common/ for what any country uses, us/ by office; every build's output was checked
+byte-for-byte unchanged. Poland goes in pipeline/pl/; web/data/ gets country folders then too.
 
 Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland
 (PKW results down to gmina, live for the 2027 parliamentary election), more countries.

@@ -10,7 +10,7 @@
 #     TIGER/Line 2026 120th Congress districts for the nine states with new 2026 maps
 #   NC General Assembly: 2019 congressional map (Session Law 2019-249), used in 2020
 #   unitedstates/congress-legislators (public domain): every member of Congress with their
-#     Congress (bioguide) ID, used to find official portraits (pipeline/fetch_portraits.py)
+#     Congress (bioguide) ID, used to find official portraits (pipeline/us/photos/fetch_portraits.py)
 #
 # One more file needs a manual download, because Dataverse asks for a short "guestbook"
 # form (name, email, institution, position) first:
@@ -18,7 +18,7 @@
 #   file 2020-SENATE-precinct-general.csv -> save as data/raw/congress/senate-precinct-2020.csv
 # Without it, 2020 Senate results are statewide only.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 RAW=data/raw/congress
 mkdir -p "$RAW/shapes"

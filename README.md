@@ -24,20 +24,20 @@ The page opens on the map colored by state, with the national result in electora
 The processed data in `web/data/` is committed, so this is only needed when sources change. It requires uv, git and [mapshaper](https://github.com/mbloch/mapshaper) (`npm install -g mapshaper`).
 
 ```
-./pipeline/fetch_data.sh          # downloads raw sources into data/raw/
-./pipeline/build_geo.sh           # county shapes -> web/data/geo.json
-uv run pipeline/build_results.py  # results -> web/data/results.json
+./pipeline/us/president/fetch_data.sh          # downloads raw sources into data/raw/
+./pipeline/us/president/build_geo.sh           # county shapes -> web/data/geo.json
+uv run -m pipeline.us.president.build_results  # results -> web/data/results.json
 ```
 
 Senate and House (needs mapshaper too; one file needs a manual download, see the script):
 
 ```
-./pipeline/fetch_congress.sh        # FEC, Clerk of the House, MEDSL, Census -> data/raw/congress/
-./pipeline/build_house_geo.sh       # district shapes -> web/data/house/plans-<year>.json + plans.json
-uv run pipeline/build_senate.py     # -> web/data/senate.json
-uv run pipeline/build_house.py      # -> web/data/house.json
-uv run pipeline/fetch_portraits.py  # official portraits of members of Congress -> photos/congress/
-uv run pipeline/build_photos.py     # shrinks them -> web/img/congress/
+./pipeline/us/congress/fetch_congress.sh      # FEC, Clerk of the House, MEDSL, Census -> data/raw/congress/
+./pipeline/us/congress/build_house_geo.sh     # district shapes -> web/data/house/plans-<year>.json + plans.json
+uv run -m pipeline.us.congress.build_senate   # -> web/data/senate.json
+uv run -m pipeline.us.congress.build_house    # -> web/data/house.json
+uv run -m pipeline.us.photos.fetch_portraits  # official portraits of members of Congress -> photos/congress/
+uv run -m pipeline.us.photos.build_photos     # shrinks them -> web/img/congress/
 ```
 
 Candidates who have served in Congress are matched to their Congress (bioguide) ID using the
@@ -49,7 +49,7 @@ candidates show their initials.
 
 Both builds compare every race's leading candidates across sources and stop on an unexplained difference above 0.1%. Known differences and corrections are listed, with their sources, at the top of each script.
 
-Candidate portraits: put original photos in `photos/` (not committed) and run `uv run pipeline/build_photos.py`. See `web/img/candidates/README.md` for file names.
+Candidate portraits: put original photos in `photos/` (not committed) and run `uv run -m pipeline.us.photos.build_photos`. See `web/img/candidates/README.md` for file names.
 
 Party icons: put them in `photos/parties/` named by party code (`D.svg`, `R.svg`; also `L`, `G`, `I`; SVG preferred) and run the same script. A party without an icon shows its letter, as in "(D)".
 

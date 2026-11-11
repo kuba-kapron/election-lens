@@ -1,15 +1,15 @@
-"""Type in live numbers or race calls by hand. The importer (pipeline/live.py) picks them up
+"""Type in live numbers or race calls by hand. The importer (pipeline/us/live/importer.py) picks them up
 on its next round (within a minute).
 
-    uv run pipeline/live_manual.py set MI-sen El-Sayed=1234567 Rogers=1200345 --pct 45 --source "AP via NBC News"
-    uv run pipeline/live_manual.py clear MI-sen                  # back to the automatic sources
-    uv run pipeline/live_manual.py call GA-sen Ossoff --by AP     # someone has called the race
-    uv run pipeline/live_manual.py uncall GA-sen
-    uv run pipeline/live_manual.py call KY-3 McGarvey --by AP     # House district (KY-AL / WY-AL at large)
-    uv run pipeline/live_manual.py call XX-N Name1 Name2 --runoff --by AP   # who advanced to a runoff
-    uv run pipeline/live_manual.py show
+    uv run -m pipeline.us.live.manual set MI-sen El-Sayed=1234567 Rogers=1200345 --pct 45 --source "AP via NBC News"
+    uv run -m pipeline.us.live.manual clear MI-sen                  # back to the automatic sources
+    uv run -m pipeline.us.live.manual call GA-sen Ossoff --by AP     # someone has called the race
+    uv run -m pipeline.us.live.manual uncall GA-sen
+    uv run -m pipeline.us.live.manual call KY-3 McGarvey --by AP     # House district (KY-AL / WY-AL at large)
+    uv run -m pipeline.us.live.manual call XX-N Name1 Name2 --runoff --by AP   # who advanced to a runoff
+    uv run -m pipeline.us.live.manual show
 
-Names are last names as the page shows them; race ids are in pipeline/live_races.py
+Names are last names as the page shows them; race ids are in pipeline/us/live/races.py
 (two-letter state + "-sen" for the 35 Senate races, plus OH-gov and TX-gov). Every entry needs its source, which the page shows. --total is all votes counted,
 including other candidates; without it, the listed candidates' votes are the total.
 """
@@ -21,9 +21,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import live_races as LR
+from pipeline.us.live import races as LR
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
 RACES = {r["id"]: r for r in LR.RACES}
@@ -49,7 +49,7 @@ def house_district(text):
     if len(st) != 2 or not (num.isdigit() or num == "AL"):
         return None
     num = "00" if num == "AL" else num.zfill(2)
-    import live_sources as S
+    from pipeline.us.live import sources as S
     if st not in S.ABBR_TO_FIPS:
         return None
     races = json.loads(HOUSE_FILE.read_text())["races"] if HOUSE_FILE.exists() else {}

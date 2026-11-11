@@ -1,8 +1,8 @@
 """Find freely licensed photos on Wikimedia Commons for tonight's candidates who have no
 official congressional portrait, and write a review sheet. Nothing is used until the owner
-approves it (pipeline/fetch_commons_photos.py does the download for approved photos).
+approves it (pipeline/common/fetch_commons_photos.py does the download for approved photos).
 
-    uv run pipeline/find_commons_photos.py
+    uv run -m pipeline.us.photos.find_commons_photos
 
 For each candidate: search Wikipedia for their article (must describe them as a politician
 or candidate), take the photo from the article's infobox, and read that file's license and
@@ -12,7 +12,7 @@ that live on Wikipedia only (usually non-free) are rejected.
 Wikimedia's robots.txt closes its data APIs (/w/, /api/) to scripts, and its public search
 API rate-limits anonymous scripts, so this uses only ordinary pages robots.txt allows:
 articles at their plain address and Commons file pages, through the polite fetcher
-(pipeline/live_fetch.py), one request a second.
+(pipeline/common/fetch.py), one request a second.
 
 Writes data/raw/people/candidates.json and a review sheet, data/raw/people/review.html.
 """
@@ -25,9 +25,9 @@ import time
 import urllib.parse
 from pathlib import Path
 
-import live_fetch as F
+from pipeline.common import fetch as F
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "data" / "raw" / "people"
 STATE_NAMES = {s["abbr"]: s["name"] for s in json.loads((ROOT / "web/data/results.json").read_text())["states"].values()}
 FREE = re.compile(r"^(public domain|pd\b|cc0|cc[- ]by(-sa)?[- ][0-9.]+|cc[- ]by(-sa)?$)", re.I)

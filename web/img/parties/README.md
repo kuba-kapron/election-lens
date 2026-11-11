@@ -1,7 +1,7 @@
 # Party icons
 
 The small icons shown after candidates' names, plus `parties.json`, the list of icons that
-exist. Both are made by `pipeline/build_photos.py` from originals in `photos/parties/`
+exist. Both are made by `pipeline/us/photos/build_photos.py` from originals in `photos/parties/`
 (named by party code: `D.svg`, `R.svg`, ...). Don't add files here by hand.
 
 ## Sources and licenses

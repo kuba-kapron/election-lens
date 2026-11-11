@@ -6,7 +6,7 @@
 # first; capital: 2 = national (Washington), 1 = state capital, 0 = neither (Natural Earth's featurecla).
 # Needs: mapshaper.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 TMP=$(mktemp -d)
 mapshaper data/raw/places/ne_10m_populated_places_simple.shp \

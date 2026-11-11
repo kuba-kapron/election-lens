@@ -1,6 +1,6 @@
 """Governor results 2018, 2022, 2024 -> web/data/governor.json (statewide, per candidate).
 
-Source: MEDSL official precinct returns (pipeline/fetch_governor.sh), summed to the state.
+Source: MEDSL official precinct returns (pipeline/us/governor/fetch_governor.sh), summed to the state.
 Candidates on several party lines (New York's fusion ballots) are summed into one; the party is
 Democratic or Republican when any of their lines is, else the line with the most votes.
 Blank, over- and under-votes are left out; write-ins count toward the total only.
@@ -20,7 +20,7 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 RAW = ROOT / "data/raw/governor"
 OUT = ROOT / "web/data/governor.json"
 csv.field_size_limit(10**9)
@@ -137,7 +137,7 @@ def main():
     for y in ("2018", "2022", "2024"):
         files = sorted((RAW / y).glob("*.zip"))
         if not files:
-            sys.exit(f"no files in {RAW / y}: run pipeline/fetch_governor.sh")
+            sys.exit(f"no files in {RAW / y}: run pipeline/us/governor/fetch_governor.sh")
         years[y] = build_year(files)
     known = known_parties(years)
     for y, sts in years.items():

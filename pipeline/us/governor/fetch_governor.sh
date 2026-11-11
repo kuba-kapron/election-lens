@@ -8,7 +8,7 @@
 #     2024: one zip per state, the 11 states that elected a governor     ~25 MB
 #   2020 (11 races) is on Harvard Dataverse behind a guestbook form; not fetched.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 RAW=data/raw/governor
 mkdir -p "$RAW/2018" "$RAW/2022" "$RAW/2024"

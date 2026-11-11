@@ -14,7 +14,7 @@
 #          file may show Missouri's new map, which the courts blocked for 2026, so only those
 #          nine states are taken from it.
 #
-# Which states changed is measured (pipeline/house_plans.py), not typed in. One level of
+# Which states changed is measured (pipeline/us/congress/house_plans.py), not typed in. One level of
 # detail for every source (points closer than 1 km merged), because the 2026 TIGER files are
 # far more detailed than the earlier cartographic ones.
 #
@@ -22,7 +22,7 @@
 # only: DC and the territories elect non-voting delegates and are left out.
 # Needs: mapshaper, and data/raw/congress/shapes filled by fetch_congress.sh.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 SH=data/raw/congress/shapes
 TMP=$(mktemp -d)
@@ -73,7 +73,7 @@ mapshaper -i "$TMP/d2026new.json" "$TMP/d2026rest.json" combine-files \
 
 # which states drew a new map each year, and one file per year with only those states
 mkdir -p web/data/house
-python3 pipeline/house_plans.py "$TMP" web/data/house/plans.json 2020 2022 2024 2026
+python3 -m pipeline.us.congress.house_plans "$TMP" web/data/house/plans.json 2020 2022 2024 2026
 for y in 2020 2022 2024 2026; do
   mapshaper -i "$TMP/d$y.json" \
     -rename-layers districts \

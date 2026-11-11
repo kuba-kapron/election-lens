@@ -6,7 +6,7 @@
   const [geo, data, photoList, partyIcons, congressList, peoplePhotos] = await Promise.all([
     d3.json("data/geo.json"),
     d3.json("data/results.json"),
-    d3.json("img/candidates/photos.json").catch(() => []), // made by pipeline/build_photos.py
+    d3.json("img/candidates/photos.json").catch(() => []), // made by pipeline/us/photos/build_photos.py
     d3.json("img/parties/parties.json").catch(() => ({})), // same script: {"D": "D.svg", ...}
     d3.json("img/congress/congress.json").catch(() => []), // same script: Congress IDs with a portrait
     d3.json("img/people/people.json").catch(() => ({})), // same script: Commons photos and their credits
@@ -17,7 +17,7 @@
   // Senate and House data (and each year's district shapes) load the first time they are shown
   const extra = { senate: null, house: null, live: null, districts: {}, plans: null, planFiles: {} };
   // election night: web/data/live/<office>.json (senate, governor, house), written every minute
-  // by pipeline/live.py; only the office being viewed is loaded and re-read. Each file carries
+  // by pipeline/us/live/importer.py; only the office being viewed is loaded and re-read. Each file carries
   // the same "night" summary (any votes yet, Senate calls) for the year ribbon.
   const LIVE_OFFICES = ["senate", "governor", "house"];
   const liveOffice = o => (LIVE_OFFICES.includes(o) ? o : "senate");
@@ -1968,7 +1968,7 @@
   }
   function liveNationBody() {
     const rs = [...sYear()].sort((a, b) => data.states[a.st].abbr.localeCompare(data.states[b.st].abbr) || SEAT_ORDER[a.seat] - SEAT_ORDER[b.seat]);
-    if (!rs.length) return `<p class="empty">No results file yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
+    if (!rs.length) return `<p class="empty">No results file yet. Start the importer: <code>uv run -m pipeline.us.live.importer</code></p>`;
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";
     return `${test}${state.office === "senate" ? senateBalanceBody() : governorTallyBody(rs)}`;
   }
@@ -2144,7 +2144,7 @@
   }
   function liveHouseNationBody() {
     const rs = Object.values(hRaces());
-    if (!rs.length) return `<p class="empty">No House results yet. Start the importer: <code>uv run pipeline/live.py</code></p>`;
+    if (!rs.length) return `<p class="empty">No House results yet. Start the importer: <code>uv run -m pipeline.us.live.importer</code></p>`;
     const x = liveHouseTally(rs), t = {};
     for (const p of ["D", "R"]) t[p] = { solid: x.won[p], lead: x[p] - x.won[p], lines: [`${x.won[p]} won`, `${x[p] - x.won[p]} leading`] };
     const test = rs.some(r => r.test) ? `<p class="test-flag">Test data, not real results</p>` : "";

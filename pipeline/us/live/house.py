@@ -3,11 +3,11 @@ governor races: every US House district from the same files, so no extra request
 
 Each state has a pattern that matches its US House contests only (not its state house) and
 gives the district number; at-large states have one contest. A district with official votes
-replaces civicAPI's numbers for that district (pipeline/live.py); otherwise civicAPI stays.
+replaces civicAPI's numbers for that district (pipeline/us/live/importer.py); otherwise civicAPI stays.
 
     district readings = HOUSE[state]["read"](spec)  ->  {"01": Reading, ...}
 
-Kept apart from live_sources.py so the tested Senate and governor readers are not touched.
+Kept apart from sources.py so the tested Senate and governor readers are not touched.
 """
 
 import csv
@@ -18,9 +18,9 @@ import tempfile
 import urllib.parse
 import zipfile
 
-import live_fetch as F
-import xlsx
-from live_sources import Reading, _fetched
+from pipeline.common import fetch as F
+from pipeline.common import xlsx
+from pipeline.us.live.sources import Reading, _fetched
 
 
 def _dist(pattern, name):
@@ -268,7 +268,7 @@ def read_nd(spec):
 
 def read_single(reader, src):
     """At-large states (DE, SD): the existing single-contest readers."""
-    import live_sources as S
+    from pipeline.us.live import sources as S
     return {"00": S.READERS[reader]({"st": src["st"]}, src)}
 
 

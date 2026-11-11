@@ -4,14 +4,14 @@ file: {"office", "updated", "races": {id: race}, "night"}; the Senate file also 
 (seats not up tonight, for the balance); "night" is the same small summary in every file
 (whether any race has votes, Senate calls) for the year ribbon.
 
-    uv run pipeline/live.py              # check every source, rewrite the file, repeat every minute
-    uv run pipeline/live.py --once       # one round, then stop
-    uv run pipeline/live.py --replay 20  # test: 2024 presidential results counted over 20 minutes
+    uv run -m pipeline.us.live.importer              # check every source, rewrite the file, repeat every minute
+    uv run -m pipeline.us.live.importer --once       # one round, then stop
+    uv run -m pipeline.us.live.importer --replay 20  # test: 2024 presidential results counted over 20 minutes
 
-Each race takes its numbers from the first of its sources (pipeline/live_races.py) that has
-votes, skipping any that says its data is a test. A manual entry (pipeline/live_manual.py)
+Each race takes its numbers from the first of its sources (pipeline/us/live/races.py) that has
+votes, skipping any that says its data is a test. A manual entry (pipeline/us/live/manual.py)
 overrides the sources; a race call is only ever entered by hand, with who made it. Sites are
-asked at most once every 3 minutes (pipeline/live_fetch.py); the file is rewritten every
+asked at most once every 3 minutes (pipeline/common/fetch.py); the file is rewritten every
 minute so the page's "updated" times stay current.
 """
 
@@ -24,14 +24,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import congress as C
-import live_fetch as F
-import live_house as LH
-import live_races as LR
-import live_sources as S
-import live_trail as T
+from pipeline.us.congress import sources as C
+from pipeline.common import fetch as F
+from pipeline.us.live import house as LH
+from pipeline.us.live import races as LR
+from pipeline.us.live import sources as S
+from pipeline.common import trail as T
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "web" / "data" / "live"  # one file per office
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
@@ -104,7 +104,7 @@ GOV_HISTORY = None
 
 
 def previous_governor(race):
-    """The state's last governor race (web/data/governor.json, from pipeline/build_governor.py):
+    """The state's last governor race (web/data/governor.json, from pipeline/us/governor/build_governor.py):
     2024 for New Hampshire and Vermont (two-year terms), 2022 elsewhere; None where the source
     lacks it (Tennessee 2022)."""
     global GOV_HISTORY
@@ -321,7 +321,7 @@ PARTY = {"Democratic": "D", "Republican": "R", "Libertarian": "L", "Green": "G",
 
 
 def house_calls(races, calls):
-    """Race calls entered by hand for House districts (pipeline/live_manual.py, ids like "KY-03"):
+    """Race calls entered by hand for House districts (pipeline/us/live/manual.py, ids like "KY-03"):
     the winner moves to the top, as in the Senate and governor races."""
     for key, call in calls.items():
         st, _, num = key.partition("-")
@@ -380,7 +380,7 @@ def ask_house_states(by_state=None):
 def house_lists(args, ask=False):
     """civicAPI's House races, as (race, fetched time): each state's own list where we have one
     (asked HOUSE_PER_ROUND states per round, those waiting longest first), else the all-states list.
-    States whose official results cover their districts (pipeline/live_house.py) are not asked
+    States whose official results cover their districts (pipeline/us/live/house.py) are not asked
     one by one, except Florida, whose election-night site blocks scripts."""
     by_state = {}
     try:
@@ -464,7 +464,7 @@ def house(args, started, history, plans, calls=None):
 
 def official_house(races):
     """Replace civicAPI's numbers with the state's own, district by district, where the state's
-    file has the district (pipeline/live_house.py). A district keeps civicAPI if the state's
+    file has the district (pipeline/us/live/house.py). A district keeps civicAPI if the state's
     file has no votes for it yet while civicAPI has some. Returns how many districts are official."""
     n = 0
     for st, spec in LH.HOUSE.items():
@@ -581,7 +581,7 @@ def main():
     plans = json.loads((ROOT / "web/data/house/plans.json").read_text())
     held = not_up(senate)
     started = time.time()
-    if not args.replay:  # keep earlier versions of the sources too (pipeline/live_fetch.py)
+    if not args.replay:  # keep earlier versions of the sources too (pipeline/common/fetch.py)
         F.ARCHIVE = ROOT / "data" / "raw" / "live" / "archive"
     OUT.mkdir(parents=True, exist_ok=True)
     trails = {o: T.Trail(o, test=bool(args.replay)) for o in OFFICES}

@@ -7,7 +7,7 @@
 #   - US Census cartographic boundary files for counties (2019 and 2023),
 #     shipped inside that repository's cartography/ folder
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 
 RAW=data/raw
 mkdir -p "$RAW"
@@ -23,7 +23,7 @@ fi
 unzip -o -q "$RAW/tonmcg/cartography/2020/build/cb_2019_us_county_500k.zip" -d "$RAW/c2019"
 unzip -o -q "$RAW/tonmcg/cartography/2024/build/cb_2023_us_county_500k.zip" -d "$RAW/c2023"
 
-# city labels: Natural Earth populated places (public domain), built by pipeline/build_places.sh
+# city labels: Natural Earth populated places (public domain), built by pipeline/us/president/build_places.sh
 if [ ! -f "$RAW/places/ne_10m_populated_places_simple.shp" ]; then
   mkdir -p "$RAW/places"
   curl -sSfL -A "ElectionLens/0.1 (election results map, hobby project)" -o "$RAW/places/places.zip" \

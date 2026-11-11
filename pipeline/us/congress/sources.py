@@ -18,10 +18,10 @@ import re
 import unicodedata
 from pathlib import Path
 
-from build_results import STATES  # noqa: F401  (re-exported for the builders)
-import xlsx
+from pipeline.us.states import STATES  # noqa: F401  (re-exported for the builders)
+from pipeline.common import xlsx
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 RAW = ROOT / "data" / "raw" / "congress"
 ABBR = {abbr: fips for fips, (_, abbr) in STATES.items()}
 STATE_BY_NAME = {name.upper(): fips for fips, (name, _) in STATES.items()}
@@ -376,7 +376,7 @@ def _legislators():
         for f in ("legislators-current.json", "legislators-historical.json"):
             path = RAW / f
             if not path.exists():
-                raise SystemExit(f"{path.relative_to(ROOT)} is missing: run pipeline/fetch_congress.sh")
+                raise SystemExit(f"{path.relative_to(ROOT)} is missing: run pipeline/us/congress/fetch_congress.sh")
             for p in json.loads(path.read_text()):
                 if max(t["end"] for t in p["terms"]) < "1995":
                     continue  # nobody who left Congress before 1995 ran in 2020-2024

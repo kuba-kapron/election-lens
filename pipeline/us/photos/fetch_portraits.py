@@ -4,9 +4,9 @@ Reads the Congress (bioguide) IDs that build_senate.py and build_house.py attach
 candidates, and downloads each person's official portrait from the unitedstates/images
 project (https://github.com/unitedstates/images). The portraits are US government works,
 in the public domain. Originals go to photos/congress/<ID>.jpg (not committed); then run
-pipeline/build_photos.py to make the small round portraits the page uses.
+pipeline/us/photos/build_photos.py to make the small round portraits the page uses.
 
-    uv run pipeline/fetch_portraits.py
+    uv run -m pipeline.us.photos.fetch_portraits
 
 Files already downloaded are skipped. Some members have no portrait there yet; they are
 listed at the end and keep their initials on the page.
@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "photos" / "congress"
 URL = "https://unitedstates.github.io/images/congress/225x275/{}.jpg"
 
@@ -31,7 +31,7 @@ def congress_ids():
         for races in data["races"].values():
             for race in races.values() if isinstance(races, dict) else races:
                 ids.update(c["bio"] for c in race["cands"] if "bio" in c)
-    for live in sorted((ROOT / "web" / "data" / "live").glob("*.json")):  # tonight's candidates (pipeline/live.py)
+    for live in sorted((ROOT / "web" / "data" / "live").glob("*.json")):  # tonight's candidates (pipeline/us/live/importer.py)
         for race in json.loads(live.read_text())["races"].values():
             ids.update(c["bio"] for c in race["cands"] if "bio" in c)
     return sorted(ids)

@@ -9,8 +9,8 @@ optionally with one or more years for a photo used only in those elections:
 
 Any of .jpg, .jpeg, .png or .webp works. Run:
 
-    uv run pipeline/build_photos.py                      # keeps the originals in photos/
-    uv run pipeline/build_photos.py --delete-originals   # deletes each original once processed
+    uv run -m pipeline.us.photos.build_photos                      # keeps the originals in photos/
+    uv run -m pipeline.us.photos.build_photos --delete-originals   # deletes each original once processed
 
 Each photo is cropped to a square around the upper part of the picture (where the face is in
 an official portrait), resized to 128 x 128 pixels and saved as
@@ -20,11 +20,11 @@ Originals are never published (photos/ is in .gitignore). Portraits already in
 web/img/candidates/ are kept; to remove one, delete its .jpg there and run the script again.
 
 Official portraits of members of Congress (Senate and House candidates) are downloaded by
-pipeline/fetch_portraits.py into photos/congress/<Congress ID>.jpg; this script shrinks them
+pipeline/us/photos/fetch_portraits.py into photos/congress/<Congress ID>.jpg; this script shrinks them
 the same way into web/img/congress/<ID>.jpg and lists them in web/img/congress/congress.json.
 
 Candidate photos from Wikimedia Commons (approved by the owner, downloaded by
-pipeline/fetch_commons_photos.py into photos/people/<state>-<last name>.jpg with their credits
+pipeline/common/fetch_commons_photos.py into photos/people/<state>-<last name>.jpg with their credits
 in photos/people/credits.json) are shrunk the same way into web/img/people/, and the credits
 are listed in web/img/people/people.json for the page's footer.
 
@@ -43,7 +43,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "photos"
 OUT = ROOT / "web" / "img" / "candidates"
 PEOPLE_SRC = SRC / "people"

@@ -26,7 +26,7 @@ import urllib.robotparser
 from pathlib import Path
 from urllib.parse import urlsplit
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "data" / "raw" / "live"
 USER_AGENT = "ElectionLens/0.1 (election results map, hobby project)"
 MIN_INTERVAL = 180  # seconds between requests to the same address
