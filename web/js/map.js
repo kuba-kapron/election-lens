@@ -1,17 +1,18 @@
 // The map: shapes, zoom, selection, arrows and badges.
 import { state } from "./state.js";
-import { H, W, counties, ct2023, extra, nationOutline, path, shapeById, stateById, stateMesh, states } from "./data.js";
-import { SINGLE, atLarge, countyLean, districtShape, ec, hRaces, isLive, sYear, senLike, senateRace, senateRaces, shift, stateOf } from "./rules.js";
-import { categorical, color, colors, leanColor, raceFill, stateFill, value } from "./colors.js";
+import { H, W, counties, ct2023, nationOutline, path, shapeById, stateById, stateMesh, states } from "./data.js";
+import { SINGLE, atLarge, districtShape, shift, stateOf } from "./rules.js";
+import { colors } from "./colors.js";
 import { drawPlaces, placeScale } from "./places.js";
 import { showTip } from "./tooltip.js";
 import { drawLegend } from "./legend.js";
 import { select } from "./actions.js";
+import { view } from "./views/index.js";
 
-export function visibleShapes(y) {
-  if (state.office === "senate" || state.office === "governor") return counties; // Senate county figures use the old Connecticut counties
-  return y === 2024 ? counties.filter(f => f.properties.st !== "09").concat(ct2023) : counties;
-}
+// the county shapes of a year's map (each view picks: see views/)
+export const visibleShapes = y => view().countyShapes(y);
+// from 2024 Connecticut reports by planning region, not county
+export const withNewConnecticut = y => (y === 2024 ? counties.filter(f => f.properties.st !== "09").concat(ct2023) : counties);
 
 export const svg = d3.select("#map").attr("viewBox", `0 0 ${W} ${H}`);
 export const defs = svg.append("defs");
@@ -104,13 +105,11 @@ window.addEventListener("pointerdown", e => {
 export const wrap = document.querySelector(".map-wrap");
 
 export function drawMap() {
-  const y = String(state.year);
+  const v = view();
   drawPatterns();
-  gDistricts.style("display", state.office === "house" ? null : "none");
-  gCounties.style("display", state.office === "house" ? "none" : null);
-  if (state.office !== "president") return drawCongressMap();
-  countyPaths().attr("fill", f => color(value(f.properties.id, y)));
-  statePaths().attr("fill", f => stateFill(f.properties.st, y));
+  gDistricts.style("display", v.districts ? null : "none");
+  gCounties.style("display", v.districts ? "none" : null);
+  v.drawShapes();
   drawMapExtras();
 }
 // the map's shapes, made once (county and state outlines do not change between years)
@@ -135,7 +134,7 @@ export const centroidOf = f => {
   return centroids.get(key);
 };
 export function drawArrows() {
-  const on = state.office === "president" && state.mode === "shift" && state.arrows;
+  const on = view().shift && state.mode === "shift" && state.arrows;
   gArrows.style("display", on ? null : "none");
   d3.select("#map").classed("arrows-on", on).classed("by-states", state.level === "states");
   if (!on) { gArrows.selectAll("*").remove(); return; }
@@ -170,22 +169,7 @@ export function drawArrows() {
     });
 }
 
-// Maine and Nebraska split their electoral votes by district: in split years a badge inside
-// the state shows how many the second candidate won, in that candidate's color
-export function drawBadges() {
-  if (state.office !== "president") return drawSenateBadges();
-  const y = String(state.year);
-  const show = categorical() && state.sel.type === "nation";
-  const splits = show
-    ? Object.entries(ec(y).states).filter(([, [d, r]]) => d && r).map(([st, [d, r]]) => {
-        const minor = d < r ? "dem" : "gop";
-        return { st, p: minor, n: Math.min(d, r), xy: path.centroid(stateById.get(st)) };
-      })
-    : [];
-  const b = badgeMarks(splits);
-  b.select("circle").attr("fill", d => colors[d.p + "Solid"]);
-  b.select("text").text(d => d.n);
-}
+export const drawBadges = () => view().badges();
 // round badges inside states, one per item ({ st, xy }): the caller fills in color and text
 export const badgeMarks = items => gBadges.selectAll("g.ev-badge").data(items, d => d.st)
   .join(enter => {
@@ -195,9 +179,10 @@ export const badgeMarks = items => gBadges.selectAll("g.ev-badge").data(items, d
     return e;
   })
   .attr("transform", d => `translate(${d.xy[0]},${d.xy[1]})`);
+// what a click on a shape picks (each view decides: see views/)
+export const clickTarget = f => view().target(f);
 // At country level a click picks the state; inside the chosen state it picks a county
-export function clickTarget(f) {
-  if (state.office === "house") return houseTarget(f);
+export function countyTarget(f) {
   const st = f.properties.st;
   const inState = stateOf(state.sel) === st;
   if (!inState || SINGLE.has(st)) return { type: "state", id: st };
@@ -218,43 +203,8 @@ export function drawSelection() {
     // only counties a click would pick get a county outline on hover
     .classed("pickable", d => d.properties.st === st && !SINGLE.has(st));
   // States view: the chosen state opens up to show its counties
-  gStates.style("display", state.level === "states" && state.office !== "house" ? null : "none")
+  gStates.style("display", state.level === "states" && !view().districts ? null : "none")
     .selectAll("path.state-fill")
     .style("display", d => (d.properties.st === st && !SINGLE.has(st) ? "none" : null))
     .classed("dim", d => !!st && d.properties.st !== st);
-}
-export function houseTarget(f) {
-  const st = f.properties.st;
-  if (stateOf(state.sel) !== st || atLarge(st)) return { type: "state", id: st };
-  return { type: "district", id: f.properties.id };
-}
-export function drawCongressMap() {
-  if (senLike()) {
-    countyPaths().attr("fill", f => {
-      const r = senateRace(f.properties.st), l = countyLean(r, f.properties.id);
-      // live: a county of a followed state with no votes yet is "not counted yet", not "no race"
-      return isLive() && r && !l ? colors.pending : leanColor(l);
-    });
-    statePaths().attr("fill", f => raceFill(senateRace(f.properties.st)));
-  } else {
-    const races = hRaces();
-    gDistricts.selectAll("path.district")
-      .data(extra.districts[state.year], f => f.properties.id)
-      .join(enter => mapHandlers(enter.append("path").attr("class", "district")))
-      .attr("d", path) // district lines change from year to year
-      .attr("fill", f => raceFill(races[f.properties.id]));
-  }
-  drawMapExtras();
-}
-
-// a "2" on states with two Senate races that year (regular and special)
-export function drawSenateBadges() {
-  const show = senLike() && state.sel.type === "nation" && state.level === "states";
-  const items = show
-    ? [...new Set(sYear().map(r => r.st))].filter(st => senateRaces(st).length > 1)
-      .map(st => ({ st, xy: path.centroid(stateById.get(st)) }))
-    : [];
-  const b = badgeMarks(items);
-  b.select("circle").attr("fill", colors.ink);
-  b.select("text").text("2").style("fill", colors.bg);
 }

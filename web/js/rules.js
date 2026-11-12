@@ -16,8 +16,6 @@ export function wonBy(sel, y, v) {
 export const ec = y => data.electoral[String(y)];
 // ["gop", "dem"] or ["dem", "gop"]: the party with the larger count first
 export const byCount = (d, r) => (d >= r ? ["dem", "gop"] : ["gop", "dem"]);
-// nationally the Electoral College winner always comes first, even if they lost the popular vote
-export const winnerFirst = y => (data.candidates[y].won === "dem" ? ["dem", "gop"] : ["gop", "dem"]);
 export function evOf(st, y) { const e = ec(y).states[st]; return e[0] + e[1]; }
 export function prevYear(y) { const i = years.indexOf(+y); return i > 0 ? years[i - 1] : null; }
 export function shift(sel, y) {
@@ -43,7 +41,6 @@ export function houseRaces(y) { return (+y === LIVE_YEAR ? liveFile("house")?.ra
 export const hRaces = () => houseRaces(state.year);
 // the live page (election night 2026) reuses the Senate views: same race shape, one "year"
 export const isLive = () => state.year === LIVE_YEAR;
-export const senLike = () => state.office === "senate" || state.office === "governor";
 export const liveRaces = (o = state.office) => Object.values(liveFile(o)?.races || {});
 export const sYear = (y = state.year) => (+y === LIVE_YEAR
   ? liveRaces(state.office === "governor" ? "governor" : "senate")

@@ -1,13 +1,14 @@
 // The results panel and the breadcrumb.
 import { state, ui } from "./state.js";
-import { data, extra } from "./data.js";
+import { data } from "./data.js";
 import { fmtInt } from "./format.js";
-import { SINGLE, atLarge, byCount, countyLean, ec, evOf, hRaces, houseMajority, houseNet, houseVotes, isLive, isNewSeat, lean, pastGains, pastMark, prevYear, record, sYear, senateControl, senatePopular, senateRace, senateRaces, shift, shownRound, stateDistricts, stateOf, tieBreaker, wonBy } from "./rules.js";
-import { colors } from "./colors.js";
-import { CAUCUS_NAME, COUNTRY, SENATE_POP_NOTE, candRow, countyName, districtName, drawPhotoCredits, evRow, fitNames, flagBox, fullName, headline, noDataReason, notesList, partyTag, peopleRows, personRow, popSection, senateNeed, tugBar, wonParts } from "./components.js";
-import { drawLivePanel } from "./live.js";
+import { SINGLE, atLarge, countyLean, isLive, isNewSeat, lean, pastMark, shownRound, stateOf } from "./rules.js";
+import { CAUCUS_NAME, COUNTRY, countyName, districtName, drawPhotoCredits, fitNames, flagBox, notesList, peopleRows, personRow } from "./components.js";
+import { drawLiveSources } from "./live.js";
 import { filterList, historyCard, listView, racesCard } from "./cards.js";
+import { fillTrail } from "./trail.js";
 import { render, select, setYear } from "./actions.js";
+import { view } from "./views/index.js";
 
 // where the map is: "United States › Ohio › Franklin County"; each level above is a link
 export const crumbsEl = document.getElementById("crumbs");
@@ -87,58 +88,14 @@ export function splitPanel() {
   rest.append(...kids.slice(end + 1));
   panel.replaceChildren(top, rest);
 }
+// the panel: the view's HTML (see views/), its seat tabs, and tonight the sources and race chart
 export function drawPanelBody() {
-  if (state.office !== "president") return drawCongressPanel();
-  const s = state.sel, y = String(state.year), c = data.candidates[y];
-  const v = record(s, y);
-  const st = stateOf(s);
-  const where = s.type === "county" && !SINGLE.has(st) ? data.states[st].name
-    : s.type === "nation" ? "Electoral votes won, 270 needed to win"
-    : `Statewide, ${evOf(st, y)} electoral votes`;
-  let html = headline("president", s, `${y} · ${where}`);
-  // country: electoral votes, then the popular vote (the same section as Senate and House)
-  if (s.type === "nation") {
-    html += electoralBody(y, c, v) + popSection(v);
-  } else if (!v) {
-    html += `<p class="empty">No ${y} results for this place. ${noDataReason(s, state.year)}</p>`;
-  } else {
-    const sh = shift(s, y), p = prevYear(state.year);
-    const won = wonBy(s, y, v);
-    // grey facts line, as on Senate and House panels: votes · shift · district split
-    const facts = [`${fmtInt(v[2])} votes`];
-    if (sh != null) facts.push(`Shift: ${Math.abs(sh * 100).toFixed(1)} points toward ${sh >= 0 ? "Democrats" : "Republicans"} since ${p}`);
-    if (s.type === "state") {
-      const [ed, er] = ec(y).states[st];
-      if (ed && er) facts.push(`Electoral votes: ${c.gop} ${er}, ${c.dem} ${ed}`);
-    }
-    const other = v[2] - v[0] - v[1];
-    html += `<div class="cand">
-      ${byCount(v[0], v[1]).map(p => p === "dem"
-        ? candRow(fullName(c.dem) + partyTag("D"), v[0], v[2], colors.demSolid, won === "dem", c.dem, v[0] - v[1])
-        : candRow(fullName(c.gop) + partyTag("R"), v[1], v[2], colors.gopSolid, won === "gop", c.gop, v[1] - v[0])).join("")}
-      ${other > 0 ? candRow("Others", other, v[2], "var(--muted)") : ""}
-    </div>
-    <p class="note">${facts.join(" · ")}</p>`;
-    const note = data.notes?.[`${s.id}-${y}`];
-    if (note) html += `<p class="note">${note}</p>`;
-  }
-
-  panel.innerHTML = html;
+  if (isLive()) drawLiveSources();
+  panel.innerHTML = view().panel();
+  bindSeatTabs();
+  if (isLive()) fillTrail();
 }
 
-// National result as the Electoral College counted it (electoral votes won from each state)
-export function electoralBody(y, c, v) {
-  const e = ec(y), [d, r] = e.won;
-  const won = d > r ? "dem" : "gop", lost = won === "dem" ? "gop" : "dem";
-  let cast = "";
-  if (e.cast) cast = `<p class="note">When the electors met, the official count was ${c[won]} ${e.cast[won]}, ${c[lost]} ${e.cast[lost]}. ${e.cast.note}</p>`;
-  return `<div class="cand">
-      ${byCount(d, r).map(p => p === "dem"
-        ? evRow(fullName(c.dem) + partyTag("D"), d, colors.demSolid, won === "dem", c.dem)
-        : evRow(fullName(c.gop) + partyTag("R"), r, colors.gopSolid, won === "gop", c.gop)).join("")}
-    </div>
-    ${cast}`;
-}
 // a whole race: statewide (Senate) or district (House)
 export function raceBody(r) {
   if (!r.rounds.length) {
@@ -169,59 +126,9 @@ export function countyBody(r, fips) {
   return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], l.lead)}</div>
     <p class="note">${fmtInt(v[n + 1])} votes · ${note}</p>${notesList(r.notes)}`;
 }
-export function senateSeatsBody(y) {
-  const c = extra.senate.control[y], rs = sYear(y);
-  const won = { D: 0, R: 0, I: 0 };
-  for (const r of rs) won[r.cands[0].caucus]++;
-  const t = {}, pg = pastGains(rs.map(r => [r.held, r.cands[0].caucus]));
-  for (const p of ["D", "R", "I"]) t[p] = { solid: p === "I" ? 0 : c[p], lead: 0, solidText: "Seats after the election",
-    lines: [`${c[p] - won[p]} not up`, `${won[p]} won`] };
-  return `${tugBar(t, 100, senateNeed(tieBreaker(y)), pg, "seats", "", senateControl(c, y))}${popSection(senatePopular(y))}<p class="note">${SENATE_POP_NOTE}</p>`;
-}
-export function houseSeatsBody(y) {
-  const c = extra.house.seats[y];
-  const t = wonParts(c, ["D", "R"]);
-  return `${tugBar(t, 435, "218 for a majority", houseNet(y), "districts", "", houseMajority(c))}${popSection(extra.house.popular[y])}`;
-}
-export function houseStateBody(st) {
-  const races = stateDistricts(hRaces(), st).sort();
-  const won = { D: 0, R: 0, I: 0 };
-  races.forEach(([, r]) => won[r.cands[0].caucus]++);
-  // the same bar as the country view: seats won in this state's delegation, and seats that changed party
-  const t = wonParts(won, ["D", "R", "I"]);
-  return `${tugBar(t, races.length, "", houseNet(state.year, st), "districts")}${popSection(houseVotes(races.map(([, r]) => r)))}`;
-}
-
 // a state with two races (regular and special Senate, or tonight's Senate and governor): its tabs
 export function chooseSeat(seat) {
   state.seat = seat;
   render({ map: true, panel: true, hash: true });
 }
 export const bindSeatTabs = () => panel.querySelectorAll(".tabs [data-seat]").forEach(b => b.addEventListener("click", () => chooseSeat(b.dataset.seat)));
-export function drawCongressPanel() {
-  if (isLive()) return drawLivePanel();
-  const s = state.sel, y = String(state.year), sen = state.office === "senate", st = stateOf(s);
-  let html;
-  if (s.type === "nation") {
-    // seats and the popular vote together; the map's Winner | Margin control is separate
-    html = headline(sen ? "senate" : "house", s, y) + (sen ? senateSeatsBody(y) : houseSeatsBody(y));
-  } else if (sen) {
-    const rs = senateRaces(st), r = senateRace(st);
-    const kind = r && rs.length > 1 ? (r.seat === "special" ? ", special election" : ", regular election") : r && r.seat === "special" ? ", special election" : "";
-    html = headline("senate", s, `${y}${kind}`);
-    if (rs.length > 1) {
-      html += `<div class="mode tabs" role="radiogroup" aria-label="Race">${rs.map(x =>
-        `<button type="button" role="radio" aria-checked="${x === r}" data-seat="${x.seat}">${x.seat === "special" ? "Special election" : "Regular election"}</button>`).join("")}</div>`;
-    }
-    if (!r) html += `<p class="empty">No Senate race in ${data.states[st].name} in ${y}.</p>`;
-    else html += s.type === "state" ? raceBody(r) : countyBody(r, s.id);
-  } else if (s.type === "district" || atLarge(st)) {
-    const id = s.type === "district" ? s.id : `${st}-00`, r = hRaces()[id];
-    html = headline("house", { type: "district", id }, y) + (r ? raceBody(r) : `<p class="empty">No result.</p>`);
-  } else {
-    const n = stateDistricts(hRaces(), st).length;
-    html = headline("house", s, `${y} · ${n} districts`) + houseStateBody(st);
-  }
-  panel.innerHTML = html;
-  bindSeatTabs();
-}

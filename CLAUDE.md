@@ -95,6 +95,11 @@ web/js/                      the page's code as ES modules, loaded by js/main.js
                              (election rules), colors, components (shared HTML pieces), map,
                              places, tooltip, legend, nav (year ribbon), panel, live, cards,
                              trail, finder, actions (render, select), theme, hash (links)
+web/js/views/                one view per kind of race (president; statewide: Senate and governors;
+                             House), each with the same parts: map colors, click target, hover box,
+                             legend, panel, Races and History cards, year-ribbon result, headline
+                             (views/index.js lists them). The rest of the page asks view(); a new
+                             office or country adds a view instead of more if-chains (November 12, 2026)
 web/vendor/                      D3, topojson-client, Public Sans (vendored, licenses in README there)
 photos/                          original candidate photos (gitignored)
 ```

@@ -1,11 +1,11 @@
 // The Races and History cards under the map.
 import { state, ui } from "./state.js";
-import { LIVE_YEAR, data, extra, years } from "./data.js";
-import { ARROW, CHECK, attr, fold, markSpan, possessive } from "./format.js";
-import { SINGLE, advancedOf, atLarge, byStateSeat, counted, countyLean, ec, hRaces, houseMajority, houseRaces, houseVotes, isCalled, isClosed, isLive, isNewSeat, lean, liveHouseTally, margin, raceLean, record, roundOf, runoffOf, sYear, samePlan, senateBalance, senateControl, senatePopular, senateRace, senateRaces, signedMargin, stateDistricts, stateOf } from "./rules.js";
-import { categorical } from "./colors.js";
-import { CAUCUS_NAME, barChart, districtLabel, districtName, fullName, leanLabel, liveStatus, mlabel, pctText, personCell, placeName, raceRow, runoffText, seatSpan } from "./components.js";
+import { LIVE_YEAR, data } from "./data.js";
+import { ARROW, CHECK, attr, fold, markSpan } from "./format.js";
+import { advancedOf, atLarge, counted, countyLean, isCalled, isClosed, isLive, lean, margin, raceLean, roundOf, runoffOf, signedMargin, stateOf } from "./rules.js";
+import { barChart, leanLabel, liveStatus, mlabel, pctText, personCell, raceRow, runoffText } from "./components.js";
 import { racesEl } from "./panel.js";
+import { view } from "./views/index.js";
 
 // tonight: who is shown (the called winner, else the leader) and the status column
 export function liveRowParts(r) {
@@ -89,43 +89,10 @@ export function countyItem(r, fips) {
 }
 export const countyLabel = f => (data.counties[f]?.name ?? f).replace(/ (County|Parish)$/, "");
 export const byName = (a, b) => (data.counties[a]?.name ?? a).localeCompare(data.counties[b]?.name ?? b);
+// the races card's rows at this level: { title, items, first, cls }, or null (see views/)
 export function levelList(sel) {
-  const o = state.office, y = String(state.year), st = stateOf(sel);
   if (sel.type === "county" || sel.type === "district") return null;
-  if (o === "president") {
-    const c = data.candidates[y];
-    const row = (s, label, go) => {
-      const v = record(s, y), m = margin(v);
-      if (m == null) return null;
-      const p = m >= 0 ? "dem" : "gop", l = { caucus: p === "dem" ? "D" : "R", m: Math.abs(m) };
-      return { m: signedMargin(l), html: raceRow(go, label, personCell({ name: fullName(c[p]), last: c[p], party: l.caucus }), "", leanLabel(l)) };
-    };
-    if (sel.type === "nation") {
-      const sts = Object.keys(data.states).sort((a, b) => data.states[a].abbr.localeCompare(data.states[b].abbr));
-      return { title: "States", items: sts.map(s => row({ type: "state", id: s }, data.states[s].abbr, `data-go="state:${s}"`)).filter(Boolean) };
-    }
-    if (SINGLE.has(st)) return null;
-    const fs = Object.keys(data.counties).filter(f => f.startsWith(st) && data.counties[f].r[y]).sort(byName);
-    return fs.length > 1 ? { title: `Counties in ${data.states[st].name}`, items: fs.map(f => row({ type: "county", id: f }, countyLabel(f), `data-go="county:${f}"`)).filter(Boolean), cls: "places" } : null;
-  }
-  if (o === "house") {
-    const ids = Object.keys(hRaces()).filter(id => !st || id.startsWith(st + "-")).sort((a, b) =>
-      data.states[a.slice(0, 2)].abbr.localeCompare(data.states[b.slice(0, 2)].abbr) || a.localeCompare(b));
-    if (st && ids.length < 2) return null;
-    const label = id => (st ? districtLabel(id, hRaces()[id])
-      : `${data.states[id.slice(0, 2)].abbr} ${+id.slice(3) || "AL"}${isNewSeat(hRaces()[id]) ? ` <span class="new" title="New seat: no earlier holder">new</span>` : ""}`);
-    return { title: st ? `Districts in ${data.states[st].name}` : "Districts", first: st ? "1st–" : "A–Z",
-      items: ids.map(id => raceItem(hRaces()[id], label(id), `data-go="district:${id}"`)) };
-  }
-  // Senate and governors
-  if (sel.type === "nation") {
-    const rs = [...sYear()].sort(byStateSeat);
-    const here = stateOf(state.sel);
-    return rs.length ? { title: "Races", items: rs.map(r => raceItem(r, `${data.states[r.st].abbr}${r.seat === "special" ? " sp." : ""}`,
-      `data-race-st="${r.st}" data-race-seat="${r.seat}"`, r.st === here && r === senateRace(here))) } : null;
-  }
-  const r = senateRace(st), fs = Object.keys(r?.counties || {}).filter(f => data.counties[f]).sort(byName);
-  return fs.length > 1 ? { title: `Counties in ${data.states[st].name}`, items: fs.map(f => countyItem(r, f)), cls: "places" } : null;
+  return view().list(sel);
 }
 export function racesCard() {
   let sel = state.sel, spec = levelList(sel);
@@ -135,102 +102,30 @@ export function racesCard() {
   }
   if (!spec || !spec.items.length) return "";
   const st = stateOf(state.sel);
-  const cur = `data-go="${state.office === "house" && state.sel.type === "state" && atLarge(st) ? `district:${st}-00` : selKey(state.sel)}"`;
+  const cur = `data-go="${state.sel.type === "state" && atLarge(st) ? `district:${st}-00` : selKey(state.sel)}"`;
   for (const x of spec.items) if (x.html.includes(cur + ">")) x.html = x.html.replace(cur, `${cur} aria-current="true"`);
   return raceList(spec.title, spec.items, spec.first, spec.cls);
 }
 export const histRow = (y, seat, label, who, lean, cur = y === state.year) =>
   raceRow(`data-hist="${y}"${seat ? ` data-hist-seat="${seat}"` : ""}${cur ? ' aria-current="true"' : ""}`, label, who, "", lean);
+// History card bars: a margin (up for Democrats), seats or electoral votes (the majority's count,
+// up for Democrats, down for Republicans), the popular-vote margin
+const signed = l => (l.caucus === "D" ? l.m : l.caucus === "R" ? -l.m : 0);
+export const marginBar = l => ({ m: signed(l), text: mlabel(signed(l)) });
+export const seatBar = (c, ctl, total) => ({ m: ctl === "R" ? -c.R / total : ctl === "D" ? c.D / total : 0, text: ctl === "R" ? `${c.R}` : `${c.D}` });
+export const popBar = v => ({ m: margin(v), text: mlabel(margin(v)) });
+// tonight's year is included: counted so far (won or leading), marked as such on hover
+export const withLive = list => (isLive() ? [...list, LIVE_YEAR] : list);
+// The history card: the view gives { title, pts, note } (pts: one per election, oldest first,
+// each a row (year | who | lean) and a bar (m: signed value, text: its label)), or its own HTML.
+// Country views chart seats under the Winner map and the popular-vote margin under Margin, like
+// the year ribbon; the rows keep the seats
 export function historyCard() {
-  const s = state.sel, o = state.office, st = stateOf(s);
-  // pts: one per election, oldest first; each gives a row (year | who | lean) and a bar
-  // (m: signed value, text: its label). Country views chart seats under the Winner map and the
-  // popular-vote margin under Margin, like the year ribbon; the rows keep the seats
-  const mapSeats = o === "president" ? categorical() : state.cmap === "winner";
-  const seatsChart = s.type === "nation" && (ui.histMode ? ui.histMode === "seats" : mapSeats), pts = [];
-  const signed = l => (l.caucus === "D" ? l.m : l.caucus === "R" ? -l.m : 0);
-  const marginBar = l => ({ m: signed(l), text: mlabel(signed(l)) });
-  // seats or electoral votes: the majority's count, up for Democrats, down for Republicans
-  const seatBar = (c, ctl, total) => ({ m: ctl === "R" ? -c.R / total : ctl === "D" ? c.D / total : 0, text: ctl === "R" ? `${c.R}` : `${c.D}` });
-  const popBar = v => ({ m: margin(v), text: mlabel(margin(v)) });
-  // tonight's year is included: counted so far (won or leading), marked as such on hover
-  const withLive = list => (isLive() ? [...list, LIVE_YEAR] : list);
-  let title = "", note = "";
-  if (o === "president") {
-    const span = `${years[0]}–${years[years.length - 1]}`;
-    title = s.type !== "nation" ? `Margin in ${placeName(s)}, ${span}` : `Every election, ${span}`;
-    for (const y of years) {
-      const c = data.candidates[y];
-      if (s.type === "nation") {
-        const [d, r] = ec(y).won, p = c.won, ctl = p === "dem" ? "D" : "R";
-        pts.push({ y, who: personCell({ name: fullName(c[p]), last: c[p], party: ctl }),
-          lean: `<span class="mg ${ctl.toLowerCase()}">${Math.max(d, r)}–${Math.min(d, r)}</span>`,  // winner first
-          ...(seatsChart ? seatBar({ D: d, R: r }, ctl, 538) : popBar(data.nation[y])) });
-        continue;
-      }
-      const m = margin(record(s, String(y)));
-      if (m == null) continue;
-      const p = m >= 0 ? "dem" : "gop", l = { caucus: p === "dem" ? "D" : "R", m: Math.abs(m) };
-      pts.push({ y, who: personCell({ name: fullName(c[p]), last: c[p], party: l.caucus }), lean: leanLabel(l), ...marginBar(l) });
-    }
-  } else if (o === "governor") {
-    // governor history has no page of its own yet: last time only, not a link
-    const r = st && senateRace(st), p = r?.prev;
-    if (!p) return "";
-    const w = p.cands.reduce((a, b) => (b.votes > a.votes ? b : a)), l = lean(p.cands, p.cands.map(c => c.votes), p.total);
-    return `<h3>Last time</h3><ul class="race-list">${raceRow(null, String(p.year), personCell(w), "", leanLabel(l))}</ul>
-      <p class="note">${p.year} result: MIT Election Data and Science Lab, precinct returns summed to the state.</p>`;
-  } else if (s.type === "nation") {
-    const sen = o === "senate";
-    title = `${sen ? "Senate" : "House"} after each election`;
-    for (const y of withLive(sen ? extra.senate.years : extra.house.years)) {
-      let c, pop;
-      if (y === LIVE_YEAR) {
-        // seats won or led so far (Senate: with the seats not up)
-        if (sen) { const b = senateBalance(); c = {}; for (const p of ["D", "R", "I"]) c[p] = b[p].notUp + b[p].called + b[p].leading; }
-        else c = liveHouseTally(Object.values(houseRaces(y)));
-        c = { D: c.D, R: c.R };
-        pop = sen ? senatePopular(y) : houseVotes(Object.values(houseRaces(y)));
-      } else {
-        c = sen ? extra.senate.control[y] : extra.house.seats[y];
-        pop = sen ? senatePopular(y) : extra.house.popular[y];
-      }
-      const ctl = sen ? senateControl(c, y) : houseMajority(c) ?? (c.D > c.R ? "D" : c.R > c.D ? "R" : null);
-      pts.push({ y, live: y === LIVE_YEAR, who: CAUCUS_NAME[ctl] ?? (sen ? "Tied" : "No majority"), lean: seatSpan(c, ctl),
-        ...(seatsChart ? seatBar(c, ctl, sen ? 100 : 435) : popBar(pop)) });
-    }
-  } else if (o === "senate") {
-    title = s.type === "county" ? `${placeName(s)} in Senate races` : `Senate races in ${data.states[st].name}`;
-    for (const y of withLive(extra.senate.years)) {
-      const rs = senateRaces(st, y);
-      for (const r of rs) {
-        const l = s.type === "county" ? countyLean(r, s.id) : raceLean(r);
-        if (!l) continue;
-        pts.push({ y, seat: r.seat, live: y === LIVE_YEAR, label: `${y}${r.seat === "special" ? " sp." : ""}`, cur: y === state.year && (r.seat === state.seat || rs.length === 1),
-          who: personCell(r.cands[l.lead ?? 0]), lean: leanLabel(l), ...(l.unopposed ? { m: null, text: "" } : marginBar(l)) });
-      }
-    }
-    if (!pts.length) note = `No Senate race in ${data.states[st].name} from 2020 to 2024.`;
-  } else if (s.type === "district" || atLarge(st)) {
-    const id = s.type === "district" ? s.id : `${st}-00`;
-    title = districtName(id);
-    for (const y of withLive(extra.house.years)) {
-      const r = houseRaces(y)[id], l = r && (y !== LIVE_YEAR || counted(r)) ? raceLean(r) : null;
-      if (!l) continue;
-      const faded = !samePlan(st, y, state.year);
-      pts.push({ y, faded, live: y === LIVE_YEAR, label: String(y), rowLabel: `${y}${faded ? ` <span class="old" title="Drawn differently from the ${state.year} map">old map</span>` : ""}`,
-        who: personCell(r.cands[l.lead ?? 0]), lean: leanLabel(l), ...(l.unopposed ? { m: null, text: "" } : marginBar(l)) });
-    }
-  } else {
-    title = `${possessive(data.states[st].name)} House delegation`;
-    for (const y of withLive(extra.house.years)) {
-      const mine = stateDistricts(houseRaces(y), st).map(([, r]) => r);
-      const won = y === LIVE_YEAR ? liveHouseTally(mine) : { D: 0, R: 0, I: 0 };
-      if (y !== LIVE_YEAR) for (const r of mine) won[r.cands[0].caucus]++;
-      const n = won.D + won.R + won.I, ctl = won.D > won.R ? "D" : won.R > won.D ? "R" : null;
-      pts.push({ y, live: y === LIVE_YEAR, who: CAUCUS_NAME[ctl] ?? "Even", lean: seatSpan({ D: won.D, R: won.R, I: won.I }, ctl), ...seatBar(won, ctl, n) });
-    }
-  }
+  const s = state.sel, v = view();
+  const seatsChart = s.type === "nation" && (ui.histMode ? ui.histMode === "seats" : v.mapSeats());
+  const out = v.history(seatsChart);
+  if (typeof out === "string") return out;
+  const { title, pts, note = "" } = out;
   if (!pts.length) return note ? `<h3>${title}</h3><p class="empty">${note}</p>` : "";
   for (const d of pts) {
     d.label ??= String(d.y);
@@ -242,7 +137,7 @@ export function historyCard() {
   // a chart once there are two elections to compare; country charts switch between seats (or
   // electoral votes) and the popular-vote margin, starting from what the map shows
   const chart = pts.length > 1 ? barChart(pts, title) : "";
-  const sw = chart && s.type === "nation" ? `<div class="mode" role="radiogroup" aria-label="Chart">${[["seats", o === "president" ? "Electoral votes" : "Seats"], ["pop", "Popular vote"]].map(([k, label]) =>
+  const sw = chart && s.type === "nation" ? `<div class="mode" role="radiogroup" aria-label="Chart">${[["seats", v.seatsLabel], ["pop", "Popular vote"]].map(([k, label]) =>
     `<button type="button" role="radio" aria-checked="${(k === "seats") === seatsChart}" data-hist-mode="${k}">${label}</button>`).join("")}</div>` : "";
   return `<div class="races-head"><h3>${title}</h3>${sw}</div>${chart ? `<div class="hist-body">${chart}${list}</div>` : list}`;
 }

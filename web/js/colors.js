@@ -2,6 +2,7 @@
 import { state } from "./state.js";
 import { stepOf } from "./format.js";
 import { counted, flippedFrom, isLive, margin, pickup, raceLean, record, runoffOf, seatParty, shift, shownRound, stateWinner } from "./rules.js";
+import { view } from "./views/index.js";
 
 // colors (read from CSS so dark mode follows)
 export let colors;
@@ -71,7 +72,7 @@ export function seatFill(r) {
   return r.held && r.held !== r.cands[0].caucus ? `url(#flip-${w})` : colors[w + "Solid"];
 }
 export const congressCategorical = () => !isLive() && state.cmap === "winner" &&
-  (state.office === "house" || (state.level === "states" && state.sel.type === "nation"));
+  (view().districts || (state.level === "states" && state.sel.type === "nation"));
 
 // a race's color on the map: tonight's rules, or a past year's
 export const raceFill = r => (isLive() ? liveFill(r) : pastFill(r));

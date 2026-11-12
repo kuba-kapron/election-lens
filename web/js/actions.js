@@ -1,13 +1,14 @@
 // Changing what is on screen and redrawing it.
 import { state, ui } from "./state.js";
 import { HAS, WHY_NOT, ensureData, officeFor, shapeById, stateById, yearFor, years } from "./data.js";
-import { districtShape, hRaces, houseRaces, isLive, sYear, stateOf } from "./rules.js";
+import { districtShape, houseRaces, isLive, stateOf } from "./rules.js";
 import { headline } from "./components.js";
 import { drawArrows, drawMap, drawMapExtras, zoomTo } from "./map.js";
 import { drawYears } from "./nav.js";
 import { drawCrumbs, drawPanel, panel } from "./panel.js";
 import { syncFinder } from "./finder.js";
 import { writeHash } from "./hash.js";
+import { view } from "./views/index.js";
 
 // Redraw what a change affects, always in the same order: the map tools, the page headline,
 // the year ribbon, the map, the panel and its cards, then the link in the address bar
@@ -30,9 +31,14 @@ export function select(sel, zoomIt = false) {
   }
   syncFinder();
   drawCrumbs();
-  if (state.office !== "president") drawMap(); // a Senate state's counties follow the race chosen in the panel
+  if (view().redrawOnSelect) drawMap();
   else drawMapExtras();
   render({ panel: true, hash: true });
+}
+// map options the race's view does not have: no Shift view, or no county map (districts instead)
+function fitOptions(o) {
+  if (!view(o).shift) { state.mode = "margin"; state.arrows = false; }
+  if (view(o).districts && state.level === "counties") state.level = "states";
 }
 // a new year keeps the race type when that year has it (else president, else Senate)
 export async function setYear(y) {
@@ -41,11 +47,10 @@ export async function setYear(y) {
   const officeChanged = o !== state.office;
   state.year = y;
   state.office = o;
-  if (o !== "president") { state.mode = "margin"; state.arrows = false; }
-  if (o === "house" && state.level === "counties") state.level = "states";
+  fitOptions(o);
   // a district number means a different place after redistricting: go back to its state
-  if (state.sel.type === "district" && (o !== "house" || !houseRaces(y)[state.sel.id])) state.sel = { type: "state", id: stateOf(state.sel) };
-  if (state.sel.type === "county" && o === "house") state.sel = { type: "state", id: stateOf(state.sel) };
+  if (state.sel.type === "district" && (!view(o).districts || !houseRaces(y)[state.sel.id])) state.sel = { type: "state", id: stateOf(state.sel) };
+  if (state.sel.type === "county" && view(o).districts) state.sel = { type: "state", id: stateOf(state.sel) };
   render({ toggles: true, headline: true, years: true, map: true });
   select(state.sel, officeChanged);
 }
@@ -56,17 +61,17 @@ export async function setOffice(o) {
   state.year = y;
   state.office = o;
   state.seat = "regular";
-  if (o !== "president") { state.mode = "margin"; state.arrows = false; }
+  fitOptions(o);
   // keep the chosen state; a county or district only makes sense in its own office
   const st = stateOf(state.sel);
   state.sel = st ? { type: "state", id: st } : { type: "nation" };
-  if (o === "house" && state.level === "counties") state.level = "states";
   render({ toggles: true, headline: true, years: true, map: true });
   select(state.sel, true);
 }
 export const arrowsBtn = document.getElementById("arrows");
 export function syncToggles() {
-  const pres = state.office === "president";
+  // the president's map has one Winner | Margin | Shift control; the other races Winner | Margin
+  const v = view(), pres = v.shift;
   document.querySelectorAll("[data-office]").forEach(b => {
     // every race can be picked: one without this year opens its nearest year
     const o = b.dataset.office, ok = HAS[o](state.year);
@@ -74,7 +79,7 @@ export function syncToggles() {
     b.title = ok ? "" : `${WHY_NOT[o](state.year)}: opens ${yearFor(o, state.year)}`;
   });
   // November | Final: only in a year where some race went to a runoff or a ranked-choice count
-  const roundsHere = !isLive() && (state.office === "senate" ? sYear() : state.office === "house" ? Object.values(hRaces()) : []).some(r => r.rounds?.length > 1);
+  const roundsHere = !isLive() && v.roundRaces().some(r => r.rounds?.length > 1);
   document.getElementById("round-toggle").hidden = !roundsHere;
   document.querySelectorAll("[data-round]").forEach(b => b.setAttribute("aria-checked", String((b.dataset.round === "november") === !!state.firstRound)));
   const shown = state.mode === "shift" ? "shift" : state.level === "counties" ? "margin" : state.cmap;
@@ -82,14 +87,14 @@ export function syncToggles() {
   document.querySelectorAll("[data-level]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.level === state.level)));
   // Senate and House show the margin only (no Shift yet); the House map is by district
   document.querySelector("[data-mode]").parentElement.hidden = !pres;
-  document.getElementById("level-toggle").hidden = state.office === "house";
+  document.getElementById("level-toggle").hidden = v.districts;
   document.querySelectorAll("[data-cmap]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.cmap === state.cmap)));
   // Winner | Margin: Senate, House and governor maps of races (not county figures)
-  document.getElementById("cmap-toggle").hidden = pres || (state.office !== "house" && state.level === "counties");
+  document.getElementById("cmap-toggle").hidden = pres || (!v.districts && state.level === "counties");
   arrowsBtn.hidden = !pres || state.mode !== "shift";
   // footer: only the sources of what is on screen (plus the lines every view needs)
-  const view = isLive() ? "live" : state.office;
-  document.querySelectorAll(".colophon [data-src]").forEach(el => { el.hidden = !el.dataset.src.split(" ").includes(view); });
+  const src = isLive() ? "live" : state.office;
+  document.querySelectorAll(".colophon [data-src]").forEach(el => { el.hidden = !el.dataset.src.split(" ").includes(src); });
   arrowsBtn.setAttribute("aria-pressed", String(state.arrows));
 }
 arrowsBtn.addEventListener("click", () => {
@@ -118,24 +123,10 @@ export function setCmap(c) {
   ui.histMode = null;
   render({ toggles: true, years: true, map: true, panel: true, hash: true });
 }
+// the page's headline, the line under it and the browser tab's title (see views/)
 export function drawHeadline() {
-  const h = document.getElementById("headline"), dek = document.getElementById("dek");
-  if (state.office === "president") {
-    h.innerHTML = `How America voted, <span class="nowrap">2000 to 2024</span>`;
-    dek.textContent = "Every presidential election since 2000, from the Electoral College down to the county. Click a state to see its counties, and a county to see how it has voted over time.";
-  } else if (state.office === "senate" && !isLive()) {
-    h.innerHTML = `How America voted for the Senate, <span class="nowrap">2020 to 2024</span>`;
-    dek.textContent = "Every Senate race in 2020, 2022 and 2024, by state and county. About a third of the Senate is elected every two years.";
-  } else if (state.office === "house" && !isLive()) {
-    h.innerHTML = `How America voted for the House, <span class="nowrap">2020 to 2024</span>`;
-    dek.textContent = "All 435 seats in 2020, 2022 and 2024, district by district.";
-  } else {
-    h.innerHTML = `Election night, <span class="nowrap">November 3, 2026</span>`;
-    dek.textContent = (state.office === "governor" ? "36 states elect a governor."
-      : state.office === "house" ? "All 435 seats, on this year's district maps (nine states drew new ones)."
-      : "35 Senate seats are on the ballot, including special elections in Florida and Ohio.")
-      + " Results from state election offices and civicAPI. Times are in your time zone.";
-  }
-  document.title = state.office === "president" ? "Election Lens"
-    : isLive() ? "Election night 2026 · Election Lens" : `${state.office === "senate" ? "Senate" : "House"} results · Election Lens`;
+  const [title, dek, tab] = view().headline();
+  document.getElementById("headline").innerHTML = title;
+  document.getElementById("dek").textContent = dek;
+  document.title = tab;
 }
