@@ -205,7 +205,7 @@ h1 {
   border-top: 1px solid var(--rule);
 }
 .years ol::-webkit-scrollbar { display: none; }
-/* as many whole years as fit at --year-min each (counted in app.js), sharing the row evenly */
+/* as many whole years as fit at --year-min each (counted in js/nav.js), sharing the row evenly */
 .years ol { --year-min: 110px; }
 .years li { flex: 0 0 calc(100% / var(--years-in-view, 7)); min-width: 0; }
 .years-step { background: none; border: 0; border-top: 1px solid var(--rule); padding: 0 10px; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; }

@@ -89,7 +89,12 @@ pipeline/                        run from the repository root: `uv run -m pipeli
   us/photos/find_commons_photos.py  Wikimedia Commons photos for US candidates: review sheet (see Live)
   us/live/                       election night, see "Live results" below
   publish.sh                     upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
-web/index.html, app.js, style.css   the page; plain JS + D3 v7, no build step
+web/index.html, style.css    the page; plain JS + D3 v7, no build step
+web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
+                             app.js on November 12, 2026): state, data (loading), format, rules
+                             (election rules), colors, components (shared HTML pieces), map,
+                             places, tooltip, legend, nav (year ribbon), panel, live, cards,
+                             trail, finder, actions (render, select), theme, hash (links)
 web/vendor/                      D3, topojson-client, Public Sans (vendored, licenses in README there)
 photos/                          original candidate photos (gitignored)
 ```
@@ -128,7 +133,7 @@ Safari caches aggressively: reload with Cmd+Option+R after changes.
 - Dates in American style everywhere, site and notes: "November 3, 2026", no "3rd"
   (decided November 6, 2026; other languages may come later, with their own formats).
   Possessives AP style: a name ending in "s" takes only the apostrophe ("Texas' 13th
-  district"), built with `possessive()` in app.js.
+  district"), built with `possessive()` in web/js/format.js.
 - Check changes in a browser at desktop and phone widths, in light and dark mode.
 
 ## Senate and House results 2020–2024
@@ -222,7 +227,7 @@ Rules agreed with the owner:
   and nothing stops.
   Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
   (Vice President Vance breaks ties). One rule for every year (decided November 12, 2026,
-  `tieBreaker()` in app.js): a 50–50 Senate goes to the Vice President's party, taken from the
+  `tieBreaker()` in web/js/rules.js): a 50–50 Senate goes to the Vice President's party, taken from the
   presidential results: the sitting VP in a midterm, the incoming one in a presidential year
   (undecided at 50–50 until that race is decided). The panel's majority mark counts certain
   seats only; the ribbon and the History card count leads too ("so far").
@@ -265,7 +270,7 @@ Rules agreed with the owner:
   numbers and time. X axis: votes counted, not the clock (decided November 6, 2026): US sources'
   "% counted" differ in meaning (precincts, polling places, civicAPI's expected vote), can go
   backwards and sit at 100% while mail is counted. For a country with one national source the
-  share counted can be the axis (TRAIL_X = "pct" in app.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
+  share counted can be the axis (TRAIL_X = "pct" in web/js/trail.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
 - Public copy: Cloudflare Pages (project election-lens), `pipeline/publish.sh --loop` uploads
   web/ every 150 s (about 200 of the free plan's 500 uploads a month per night); the importer
   runs separately. Page changes reach it only through that upload.

@@ -96,6 +96,7 @@
 
   <script src="vendor/d3.min.js"></script>
   <script src="vendor/topojson-client.min.js"></script>
-  <script src="app.js"></script>
+  <!-- the page's code, in modules (js/main.js loads the rest); opened as a file the browser refuses them -->
+  <script type="module" src="js/main.js" onerror="document.getElementById('panel').innerHTML = '<p class=&quot;empty&quot;>The map data could not be loaded. Serve the web folder over HTTP (for example <code>python3 -m http.server</code>) instead of opening the file directly.</p>'"></script>
 </body>
 </html>
