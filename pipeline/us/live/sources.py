@@ -26,7 +26,7 @@ from pathlib import Path
 from pipeline.common import fetch as F
 
 ROOT = Path(__file__).resolve().parents[3]
-ABBR_TO_FIPS = {s["abbr"]: fips for fips, s in json.loads((ROOT / "web/data/results.json").read_text())["states"].items()}
+ABBR_TO_FIPS = {s["abbr"]: fips for fips, s in json.loads((ROOT / "web/data/us/results.json").read_text())["states"].items()}
 
 
 @dataclass
@@ -57,7 +57,7 @@ def county_fips(st, name):
     global _COUNTIES
     if _COUNTIES is None:
         _COUNTIES = {}
-        for fips, c in json.loads((ROOT / "web/data/results.json").read_text())["counties"].items():
+        for fips, c in json.loads((ROOT / "web/data/us/results.json").read_text())["counties"].items():
             _COUNTIES[(fips[:2], _county_key(c["name"]))] = fips
     return _COUNTIES.get((ABBR_TO_FIPS[st], _county_key(name)))
 
@@ -442,7 +442,7 @@ READERS = {"md": read_md, "ny": read_ny, "de": read_de, "sw_csv": read_sw_csv, "
 def read_replay(race, src, started, minutes=20):
     """A fake count for testing the page: the state's 2024 presidential county results,
     counties 'reporting' one after another over `minutes`, credited to the race's D and R."""
-    data = json.loads((ROOT / "web/data/results.json").read_text())
+    data = json.loads((ROOT / "web/data/us/results.json").read_text())
     st = ABBR_TO_FIPS[race["st"]]
     rows = sorted((f, c["r"]["2024"]) for f, c in data["counties"].items() if f.startswith(st) and "2024" in c["r"])
     if not rows:  # Alaska etc.: statewide only

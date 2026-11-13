@@ -1,4 +1,4 @@
-"""Live results importer for election night, November 3, 2026. Writes web/data/live/<office>.json:
+"""Live results importer for election night, November 3, 2026. Writes web/data/us/live/<office>.json:
 senate.json, governor.json, house.json, so the page reloads only the office being viewed. Each
 file: {"office", "updated", "races": {id: race}, "night"}; the Senate file also has "not_up"
 (seats not up tonight, for the balance); "night" is the same small summary in every file
@@ -32,7 +32,7 @@ from pipeline.us.live import sources as S
 from pipeline.common import trail as T
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / "web" / "data" / "live"  # one file per office
+OUT = ROOT / "web" / "data" / "us" / "live"  # one file per office
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
 STALE_AFTER = 10 * 60  # seconds: a source not refreshed for this long is marked stale
@@ -104,12 +104,12 @@ GOV_HISTORY = None
 
 
 def previous_governor(race):
-    """The state's last governor race (web/data/governor.json, from pipeline/us/governor/build_governor.py):
+    """The state's last governor race (web/data/us/governor.json, from pipeline/us/governor/build_governor.py):
     2024 for New Hampshire and Vermont (two-year terms), 2022 elsewhere; None where the source
     lacks it (Tennessee 2022)."""
     global GOV_HISTORY
     if GOV_HISTORY is None:
-        f = ROOT / "web/data/governor.json"
+        f = ROOT / "web/data/us/governor.json"
         GOV_HISTORY = json.loads(f.read_text())["years"] if f.exists() else {}
     year = 2024 if race["st"] in ("NH", "VT") else 2022
     r = GOV_HISTORY.get(str(year), {}).get(S.ABBR_TO_FIPS[race["st"]])
@@ -576,9 +576,9 @@ def main():
     ap.add_argument("--allow-test", action="store_true", help="show sources' own test data (for a dry run)")
     ap.add_argument("--every", type=int, default=60, help="seconds between rounds (sites are asked at most every 3 min)")
     args = ap.parse_args()
-    senate = json.loads((ROOT / "web/data/senate.json").read_text())
-    history = json.loads((ROOT / "web/data/house.json").read_text())["races"]
-    plans = json.loads((ROOT / "web/data/house/plans.json").read_text())
+    senate = json.loads((ROOT / "web/data/us/senate.json").read_text())
+    history = json.loads((ROOT / "web/data/us/house.json").read_text())["races"]
+    plans = json.loads((ROOT / "web/data/us/house/plans.json").read_text())
     held = not_up(senate)
     started = time.time()
     if not args.replay:  # keep earlier versions of the sources too (pipeline/common/fetch.py)

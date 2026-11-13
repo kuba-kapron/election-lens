@@ -11,7 +11,7 @@ set -u
 cd "$(dirname "$0")/../.."
 OUT=data/check
 mkdir -p "$OUT"
-live_md5() { cat web/data/live/*.json 2>/dev/null | md5 -q; }
+live_md5() { cat web/data/us/live/*.json 2>/dev/null | md5 -q; }
 KEY="$(git rev-parse HEAD) $(live_md5) ${1:-all}"
 
 if [ "$(cat "$OUT/base.key" 2>/dev/null)" != "$KEY" ]; then
@@ -19,9 +19,11 @@ if [ "$(cat "$OUT/base.key" 2>/dev/null)" != "$KEY" ]; then
   rm -rf "$OUT/base-web"
   mkdir -p "$OUT/base-web"
   git archive HEAD web | tar -x -C "$OUT/base-web" --strip-components 1
-  # live files are not committed: use the working tree's, the same for both recordings
-  rm -rf "$OUT/base-web/data/live"
-  [ -d web/data/live ] && ln -s "$PWD/web/data/live" "$OUT/base-web/data/live"
+  # live files are not committed: use the working tree's, the same for both recordings, where
+  # the committed page looks for them (data/us/live/; data/live/ before November 13, 2026)
+  for d in "$OUT/base-web/data/us" "$OUT/base-web/data"; do
+    [ -d "$d" ] && { rm -rf "$d/live"; [ -d web/data/us/live ] && ln -s "$PWD/web/data/us/live" "$d/live"; break; }
+  done
   caffeinate -i tools/check/record.sh "$OUT/base.txt" "$OUT/base-web" ${1:+"$1"} || exit 1
   echo "$KEY" > "$OUT/base.key"
 fi

@@ -29,7 +29,7 @@ from pipeline.common import fetch as F
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "data" / "raw" / "people"
-STATE_NAMES = {s["abbr"]: s["name"] for s in json.loads((ROOT / "web/data/results.json").read_text())["states"].values()}
+STATE_NAMES = {s["abbr"]: s["name"] for s in json.loads((ROOT / "web/data/us/results.json").read_text())["states"].values()}
 FREE = re.compile(r"^(public domain|pd\b|cc0|cc[- ]by(-sa)?[- ][0-9.]+|cc[- ]by(-sa)?$)", re.I)
 
 
@@ -101,11 +101,11 @@ def commons_info(file):
 
 def main():
     live = {"races": [r for o in ("senate", "governor")  # tonight's Senate and governor candidates
-                      for r in json.loads((ROOT / f"web/data/live/{o}.json").read_text())["races"].values()]}
+                      for r in json.loads((ROOT / f"web/data/us/live/{o}.json").read_text())["races"].values()]}
     congress = set(json.loads((ROOT / "web/img/congress/congress.json").read_text()))
     OUT.mkdir(parents=True, exist_ok=True)
     abbr = {v: k for k, v in {s: f for f, s in []}.items()}
-    fips_to_abbr = {f: s["abbr"] for f, s in json.loads((ROOT / "web/data/results.json").read_text())["states"].items()}
+    fips_to_abbr = {f: s["abbr"] for f, s in json.loads((ROOT / "web/data/us/results.json").read_text())["states"].items()}
     seen, found = set(), []
     for race in live["races"]:
         st = fips_to_abbr[race["st"]]

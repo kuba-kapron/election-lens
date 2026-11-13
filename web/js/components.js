@@ -24,7 +24,7 @@ export function placeName(sel) {
   return name(sel);
 }
 // the country in view: its flag in the panel's corner and at the start of the breadcrumb
-export const COUNTRY = { name: "United States", flag: "img/flags/us.svg?v=2" };
+export const COUNTRY = { name: "United States", flag: "/img/flags/us.svg?v=2" };
 export const flagBox = () => `<span class="flag-box"><span class="flag-frame"><img class="flag" src="${COUNTRY.flag}" alt=""></span></span>`;
 export function headline(office, sel, where, special = false) {
   const k = sel.type === "nation" && office === "governor" ? "Governors" : OFFICE_HEAD[office];
@@ -57,7 +57,7 @@ export function avatar(last, fill) {
   if (!last) return `<span class="avatar empty" aria-hidden="true"></span>`;
   const key = last.toLowerCase(), who = data.people[key];
   const file = [`${key}-${state.year}`, key].find(f => photos.has(f));
-  return circle(fill, who?.initials ?? last[0], file ? `<img src="img/candidates/${file}.jpg" alt="">` : "");
+  return circle(fill, who?.initials ?? last[0], file ? `<img src="/img/candidates/${file}.jpg" alt="">` : "");
 }
 
 export function noDataReason(s, y) {
@@ -173,11 +173,11 @@ export const partyTag = c => {
   const p = typeof c === "string" ? c : c.party;
   if (!PARTY_NAME[p]) return "";
   const icon = partyIcons[p];
-  return ` <span class="party-tag" title="${PARTY_NAME[p]}">(${p})${icon ? `<img class="party" src="img/parties/${icon}" alt="">` : ""}</span>`;
+  return ` <span class="party-tag" title="${PARTY_NAME[p]}">(${p})${icon ? `<img class="party" src="/img/parties/${icon}" alt="">` : ""}</span>`;
 };
 // Round picture for a whole party (Seats and Popular vote rows): its icon, else its letter
 export const partyAvatar = (p, fill) => partyIcons[p]
-  ? `<span class="avatar party-pic" aria-hidden="true"><img src="img/parties/${partyIcons[p]}" alt=""></span>`
+  ? `<span class="avatar party-pic" aria-hidden="true"><img src="/img/parties/${partyIcons[p]}" alt=""></span>`
   : circle(fill, p);
 export function districtName(id, short = false) {
   const n = +id.slice(3), st = data.states[id.slice(0, 2)].name;
@@ -222,8 +222,8 @@ export function initialsAvatar(c, fill) {
   const parts = c.name.replace(/[^A-Za-zÀ-ž\s-]/g, "").trim().split(/\s+/);
   const ini = ((parts[0] || "")[0] || "") + ((parts[parts.length - 1] || "")[0] || "");
   const pp = !congressPhotos.has(c.bio) && peoplePhotos[c.photo];
-  const img = congressPhotos.has(c.bio) ? `<img src="img/congress/${c.bio}.jpg" alt="" loading="lazy">`
-    : pp ? `<img src="img/people/${c.photo}.jpg" alt="" loading="lazy">` : "";
+  const img = congressPhotos.has(c.bio) ? `<img src="/img/congress/${c.bio}.jpg" alt="" loading="lazy">`
+    : pp ? `<img src="/img/people/${c.photo}.jpg" alt="" loading="lazy">` : "";
   const credit = pp ? ` data-photo="${c.photo}" title="${attr(`Photo: ${pp.author}, ${/^public domain$/i.test(pp.license) ? "public domain" : pp.license}`)}"` : "";
   return circle(fill, ini.toUpperCase(), img, credit);
 }

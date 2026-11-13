@@ -11,31 +11,30 @@ Early development. Working now: US presidential results by county, 2000–2024, 
 The site is plain HTML, CSS and JavaScript with no build step. Python is managed with [uv](https://docs.astral.sh/uv/): install it once (`brew install uv`), and uv fetches the right Python version (pinned in `.python-version`) on first run. From the repository root:
 
 ```
-cd web
-uv run python -m http.server 8000
+uv run python tools/serve.py
 ```
 
-Then open http://localhost:8000. (Opening `index.html` directly from disk does not work, because the browser blocks loading the data files.)
+Then open http://localhost:8000/en/usa/. The script serves `web/` the way the public site does: every language and country address (`/en/usa/`, later `/pl/poland/`) gets the one page. (Opening `index.html` directly from disk does not work, because the browser blocks loading the data files.)
 
 The page opens on the map colored by state, with the national result in electoral votes. Links can point at a year, view and place, for example `#year=2024&view=shift&map=counties&place=48201` (Harris County, Texas, shift since 2020). Other options: `map=counties` colors the map by county, `vote=popular` shows the national popular vote, and `arrows=on` draws shift arrows in the Shift view. `race=senate` or `race=house` switches office (`#race=house&year=2024&place=06-12` is California's 12th district; `seat=special` picks a state's special Senate election).
 
 ## Rebuild the data
 
-The processed data in `web/data/` is committed, so this is only needed when sources change. It requires uv, git and [mapshaper](https://github.com/mbloch/mapshaper) (`npm install -g mapshaper`).
+The processed data in `web/data/` (one folder per country: `web/data/us/`) is committed, so this is only needed when sources change. It requires uv, git and [mapshaper](https://github.com/mbloch/mapshaper) (`npm install -g mapshaper`).
 
 ```
 ./pipeline/us/president/fetch_data.sh          # downloads raw sources into data/raw/
-./pipeline/us/president/build_geo.sh           # county shapes -> web/data/geo.json
-uv run -m pipeline.us.president.build_results  # results -> web/data/results.json
+./pipeline/us/president/build_geo.sh           # county shapes -> web/data/us/geo.json
+uv run -m pipeline.us.president.build_results  # results -> web/data/us/results.json
 ```
 
 Senate and House (needs mapshaper too; one file needs a manual download, see the script):
 
 ```
 ./pipeline/us/congress/fetch_congress.sh      # FEC, Clerk of the House, MEDSL, Census -> data/raw/congress/
-./pipeline/us/congress/build_house_geo.sh     # district shapes -> web/data/house/plans-<year>.json + plans.json
-uv run -m pipeline.us.congress.build_senate   # -> web/data/senate.json
-uv run -m pipeline.us.congress.build_house    # -> web/data/house.json
+./pipeline/us/congress/build_house_geo.sh     # district shapes -> web/data/us/house/plans-<year>.json + plans.json
+uv run -m pipeline.us.congress.build_senate   # -> web/data/us/senate.json
+uv run -m pipeline.us.congress.build_house    # -> web/data/us/house.json
 uv run -m pipeline.us.photos.fetch_portraits  # official portraits of members of Congress -> photos/congress/
 uv run -m pipeline.us.photos.build_photos     # shrinks them -> web/img/congress/
 ```

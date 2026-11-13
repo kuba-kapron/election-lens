@@ -10,7 +10,7 @@ different points, so lines are compared by shape, not point by point.
 Writes plans.json: for each year, the year whose map each state uses ({"2026": {"56": 2020,
 ...}}), and <dir>/new_<year>.txt, the states with a new map that year, as a list mapshaper's
 -filter can use. Each state map is then stored once, in the file of the year it first
-appeared (web/data/house/plans-<year>.json).
+appeared (web/data/us/house/plans-<year>.json).
 """
 
 import json

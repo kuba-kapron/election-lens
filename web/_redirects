@@ -1,0 +1,4 @@
+# Cloudflare Pages: every language and country address shows the one page (web/js/site.js reads
+# the address). 200 = served from index.html, the address stays as typed.
+/en/*  /index.html  200
+/pl/*  /index.html  200

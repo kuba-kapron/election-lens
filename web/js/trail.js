@@ -1,4 +1,5 @@
 // The race through the night chart.
+import { site } from "./site.js";
 import { state } from "./state.js";
 import { liveFile, liveOffice } from "./data.js";
 import { clock, fmtInt, possessive } from "./format.js";
@@ -6,7 +7,7 @@ import { candFill } from "./colors.js";
 import { svg, tip } from "./map.js";
 import { panel } from "./panel.js";
 
-// the race through the night (web/data/live/trail-<office>.json)
+// the race through the night (web/data/us/live/trail-<office>.json)
 // Loaded only when a race panel is open, and again only when the office file says the chart
 // file changed. Points are the source's updates as reported: a step line, no smoothing and
 // no projection; a change of source is marked.
@@ -17,7 +18,7 @@ export async function fillTrail() {
   const office = liveOffice(state.office), want = liveFile(office)?.trailUpdated;
   if (!want) return;
   if (trails[office]?.updated !== want) {
-    try { trails[office] = await d3.json(`data/live/trail-${office}.json?t=${encodeURIComponent(want)}`); } catch (e) { return; }
+    try { trails[office] = await d3.json(`${site.data}/live/trail-${office}.json?t=${encodeURIComponent(want)}`); } catch (e) { return; }
   }
   const now = panel.querySelector(`.trail[data-trail="${el.dataset.trail}"]`);  // the panel may have been redrawn meanwhile
   const tr = trails[office]?.races?.[el.dataset.trail];

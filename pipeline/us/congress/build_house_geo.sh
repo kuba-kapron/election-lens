@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the congressional district maps for every House election, storing each state's map
-# once: web/data/house/plans-<year>.json holds only the states whose districts were new that
-# year, and web/data/house/plans.json says which year's file each state uses for each election
+# once: web/data/us/house/plans-<year>.json holds only the states whose districts were new that
+# year, and web/data/us/house/plans.json says which year's file each state uses for each election
 # (2026 Wyoming -> 2020: one at-large district all along). Layer "districts", ids "SS-DD"
 # (state FIPS and district number, "00" at large).
 #   2020  116th Congress districts (Census), with North Carolina's 2019 remedial map
@@ -18,7 +18,7 @@
 # detail for every source (points closer than 1 km merged), because the 2026 TIGER files are
 # far more detailed than the earlier cartographic ones.
 #
-# Same projection as web/data/geo.json (Albers USA, Alaska and Hawaii as insets). 50 states
+# Same projection as web/data/us/geo.json (Albers USA, Alaska and Hawaii as insets). 50 states
 # only: DC and the territories elect non-voting delegates and are left out.
 # Needs: mapshaper, and data/raw/congress/shapes filled by fetch_congress.sh.
 set -euo pipefail
@@ -72,15 +72,15 @@ mapshaper -i "$TMP/d2026new.json" "$TMP/d2026rest.json" combine-files \
   -o "$TMP/d2026.json" format=geojson
 
 # which states drew a new map each year, and one file per year with only those states
-mkdir -p web/data/house
-python3 -m pipeline.us.congress.house_plans "$TMP" web/data/house/plans.json 2020 2022 2024 2026
+mkdir -p web/data/us/house
+python3 -m pipeline.us.congress.house_plans "$TMP" web/data/us/house/plans.json 2020 2022 2024 2026
 for y in 2020 2022 2024 2026; do
   mapshaper -i "$TMP/d$y.json" \
     -rename-layers districts \
     -filter-islands min-area=2000000 remove-empty \
     -simplify interval=1000 keep-shapes \
     -filter "$(cat "$TMP/new_$y.txt").indexOf(st) > -1" \
-    -o "web/data/house/plans-$y.json" format=topojson quantization=100000
+    -o "web/data/us/house/plans-$y.json" format=topojson quantization=100000
 done
 rm -rf "$TMP"
-du -h web/data/house/*.json
+du -h web/data/us/house/*.json

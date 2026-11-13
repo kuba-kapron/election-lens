@@ -1,4 +1,4 @@
-"""Governor results 2018, 2022, 2024 -> web/data/governor.json (statewide, per candidate).
+"""Governor results 2018, 2022, 2024 -> web/data/us/governor.json (statewide, per candidate).
 
 Source: MEDSL official precinct returns (pipeline/us/governor/fetch_governor.sh), summed to the state.
 Candidates on several party lines (New York's fusion ballots) are summed into one; the party is
@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 RAW = ROOT / "data/raw/governor"
-OUT = ROOT / "web/data/governor.json"
+OUT = ROOT / "web/data/us/governor.json"
 csv.field_size_limit(10**9)
 
 OFFICES = {"GOVERNOR", "GOVERNOR/LIEUTENANT GOVERNOR", "GOVERNOR AND LIEUTENANT GOVERNOR"}

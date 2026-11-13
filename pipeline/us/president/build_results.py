@@ -1,4 +1,4 @@
-"""Build web/data/results.json: US presidential results by county, 2000-2024.
+"""Build web/data/us/results.json: US presidential results by county, 2000-2024.
 
 Sources:
   2000-2016  MIT Election Data and Science Lab, official county returns
@@ -41,7 +41,7 @@ from pipeline.us.states import STATES, norm_fips
 ROOT = Path(__file__).resolve().parents[3]
 SRC = ROOT / "data" / "raw" / "tonmcg"
 MEDSL = ROOT / "data" / "raw" / "medsl" / "countypres_2000-2016.csv"
-OUT = ROOT / "web" / "data" / "results.json"
+OUT = ROOT / "web" / "data" / "us" / "results.json"
 
 YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024]
 # "won" = the party that won the Electoral College (not always the popular vote)

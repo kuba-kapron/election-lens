@@ -1,4 +1,5 @@
 // Start-up: read the link, load the data, draw the page.
+import "./site.js";  // first: the page's address (language and country)
 import { state } from "./state.js";
 import { LIVE_YEAR, curYears, ensureData, failed, liveFile, loadLive } from "./data.js";
 import { isLive } from "./rules.js";

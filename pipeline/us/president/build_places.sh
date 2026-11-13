@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# City labels for the map -> web/data/places.json: US cities from Natural Earth's populated
+# City labels for the map -> web/data/us/places.json: US cities from Natural Earth's populated
 # places (public domain; fetched by fetch_data.sh), projected like the map shapes (Albers USA,
 # Alaska and Hawaii as insets, same as build_geo.sh) so they land in the right county.
 # Each city: [name, state FIPS, population (metro, Natural Earth's pop_max), x, y, capital], largest
@@ -15,9 +15,9 @@ mapshaper data/raw/places/ne_10m_populated_places_simple.shp \
   -proj albersusa \
   -o "$TMP/places.json" format=geojson
 
-python3 - "$TMP/places.json" web/data/places.json <<'EOF'
+python3 - "$TMP/places.json" web/data/us/places.json <<'EOF'
 import json, sys
-states = json.load(open("web/data/results.json"))["states"]
+states = json.load(open("web/data/us/results.json"))["states"]
 fips = {s["name"]: f for f, s in states.items()}
 out = []
 for f in json.load(open(sys.argv[1]))["features"]:

@@ -1,14 +1,15 @@
 // Loading the data files, the elections each race has, map shapes and projection.
+import { site } from "./site.js";
 import { state } from "./state.js";
 
 export const W = 975, H = 610;
 const files = Promise.all([
-  d3.json("data/geo.json"),
-  d3.json("data/results.json"),
-  d3.json("img/candidates/photos.json").catch(() => []), // made by pipeline/us/photos/build_photos.py
-  d3.json("img/parties/parties.json").catch(() => ({})), // same script: {"D": "D.svg", ...}
-  d3.json("img/congress/congress.json").catch(() => []), // same script: Congress IDs with a portrait
-  d3.json("img/people/people.json").catch(() => ({})), // same script: Commons photos and their credits
+  d3.json(`${site.data}/geo.json`),
+  d3.json(`${site.data}/results.json`),
+  d3.json("/img/candidates/photos.json").catch(() => []), // made by pipeline/us/photos/build_photos.py
+  d3.json("/img/parties/parties.json").catch(() => ({})), // same script: {"D": "D.svg", ...}
+  d3.json("/img/congress/congress.json").catch(() => []), // same script: Congress IDs with a portrait
+  d3.json("/img/people/people.json").catch(() => ({})), // same script: Commons photos and their credits
 ]);
 export const [geo, data, photoList, partyIcons, congressList, peoplePhotos] = await files.catch(err => { failed(err); throw err; });
 // the page cannot work without its data: say how to open it
@@ -22,7 +23,7 @@ export const photos = new Set(photoList);
 
 // Senate and House data (and each year's district shapes) load the first time they are shown
 export const extra = { senate: null, house: null, live: null, districts: {}, plans: null, planFiles: {} };
-// election night: web/data/live/<office>.json (senate, governor, house), written every minute
+// election night: web/data/us/live/<office>.json (senate, governor, house), written every minute
 // by pipeline/us/live/importer.py; only the office being viewed is loaded and re-read. Each file carries
 // the same "night" summary (any votes yet, Senate calls) for the year ribbon.
 export const LIVE_OFFICES = ["senate", "governor", "house"];
@@ -30,7 +31,7 @@ export const liveOffice = o => (LIVE_OFFICES.includes(o) ? o : "senate");
 export async function loadLive(office) {
   office = liveOffice(office);
   let d = null;
-  try { d = await d3.json(`data/live/${office}.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
+  try { d = await d3.json(`${site.data}/live/${office}.json?t=${Date.now()}`); } catch (e) { /* not there yet: empty map */ }
   extra.live = extra.live || {};
   extra.live[office] = { races: d?.races || {}, notUp: d?.not_up || null, updated: d?.updated || null, trailUpdated: d?.trail_updated || null };
   if (office === "house") for (const [id, r] of Object.entries(extra.live.house.races)) r.id = id;  // the seat rule needs the district
@@ -42,19 +43,19 @@ export async function ensureData(office, year) {
     if (!liveFile(office)) await loadLive(office);
     if (office !== "house") return;
   }
-  if (office === "senate" && !extra.senate) extra.senate = await d3.json("data/senate.json");
+  if (office === "senate" && !extra.senate) extra.senate = await d3.json(`${site.data}/senate.json`);
   if (office === "house" && !extra.house) {
-    [extra.house, extra.plans] = await Promise.all([d3.json("data/house.json"), extra.plans || d3.json("data/house/plans.json")]);
+    [extra.house, extra.plans] = await Promise.all([d3.json(`${site.data}/house.json`), extra.plans || d3.json(`${site.data}/house/plans.json`)]);
     markHouseHeld();
   }
   if (office === "house" && year && !extra.districts[year]) {
     // each state's map is stored once, in the file of the year it first appeared;
     // plans.json says which file each state uses in each election
-    extra.plans = extra.plans || await d3.json("data/house/plans.json");
+    extra.plans = extra.plans || await d3.json(`${site.data}/house/plans.json`);
     const use = extra.plans[String(year)];
     const need = [...new Set(Object.values(use))];
     await Promise.all(need.filter(py => !extra.planFiles[py]).map(async py => {
-      const t = await d3.json(`data/house/plans-${py}.json`);
+      const t = await d3.json(`${site.data}/house/plans-${py}.json`);
       extra.planFiles[py] = topojson.feature(t, t.objects.districts).features;
     }));
     extra.districts[year] = need.flatMap(py => extra.planFiles[py].filter(f => use[f.properties.st] === py));

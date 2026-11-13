@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[3]
 MANUAL = ROOT / "data" / "live" / "manual.json"
 CALLS = ROOT / "data" / "live" / "calls.json"
 RACES = {r["id"]: r for r in LR.RACES}
-HOUSE_FILE = ROOT / "web" / "data" / "live" / "house.json"  # tonight's House candidates, from the importer
+HOUSE_FILE = ROOT / "web" / "data" / "us" / "live" / "house.json"  # tonight's House candidates, from the importer
 
 
 def load(path):

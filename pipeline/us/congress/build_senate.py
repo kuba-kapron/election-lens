@@ -1,4 +1,4 @@
-"""Build web/data/senate.json: US Senate results 2020-2024, statewide and by county.
+"""Build web/data/us/senate.json: US Senate results 2020-2024, statewide and by county.
 
 Sources (see pipeline/us/congress/sources.py for links):
   Statewide 2020, 2022  FEC "Federal Elections" (certified), checked against the Clerk of the
@@ -36,7 +36,7 @@ from collections import defaultdict
 from pipeline.us.congress import sources as C
 from pipeline.us.states import norm_fips
 
-OUT = C.ROOT / "web" / "data" / "senate.json"
+OUT = C.ROOT / "web" / "data" / "us" / "senate.json"
 YEARS = [2020, 2022, 2024]
 REGULAR_CLASS = {2014: 2, 2016: 3, 2018: 1, 2020: 2, 2022: 3, 2024: 1}
 # Special elections: which seat (class) they filled

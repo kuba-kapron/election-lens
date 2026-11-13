@@ -27,11 +27,11 @@ URL = "https://unitedstates.github.io/images/congress/225x275/{}.jpg"
 def congress_ids():
     ids = set()
     for name in ("senate", "house"):
-        data = json.loads((ROOT / "web" / "data" / f"{name}.json").read_text())
+        data = json.loads((ROOT / "web" / "data" / "us" / f"{name}.json").read_text())
         for races in data["races"].values():
             for race in races.values() if isinstance(races, dict) else races:
                 ids.update(c["bio"] for c in race["cands"] if "bio" in c)
-    for live in sorted((ROOT / "web" / "data" / "live").glob("*.json")):  # tonight's candidates (pipeline/us/live/importer.py)
+    for live in sorted((ROOT / "web" / "data" / "us" / "live").glob("*.json")):  # tonight's candidates (pipeline/us/live/importer.py)
         for race in json.loads(live.read_text())["races"].values():
             ids.update(c["bio"] for c in race["cands"] if "bio" in c)
     return sorted(ids)

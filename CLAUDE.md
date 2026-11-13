@@ -43,6 +43,12 @@ US presidential results 2000–2024 on one static page (`web/`):
   only for the country or their own state (their insets sit near other states). Three sizes by
   metro population (3M+, 500k+, smaller); Washington with a star, state capitals with a ring (a
   selected state's capital always gets a name when there is room).
+- Addresses (decided November 13, 2026): language first, then the country's English name:
+  `/en/usa/`, later `/pl/usa/`, `/en/poland/`, `/pl/poland/`. One index.html serves them all
+  (web/_redirects on Cloudflare, tools/serve.py locally); web/js/site.js reads the address, and
+  any other one (`/`, old links) is shown as `/en/usa/` with what follows it kept. File paths in
+  the page start at the root (`/data/...`), not relative: a `<base>` tag would break the map's
+  `url(#flip-dem)` stripes in some browsers.
 - Shareable links: `#year=2024&view=shift&map=counties&color=margin&arrows=on&place=48201`.
   Defaults are left out of the link; old `#2024/margin/48201` and `vote=popular` (opens
   Margin) links still work.
@@ -69,20 +75,20 @@ pipeline/                        run from the repository root: `uv run -m pipeli
   us/                            everything specific to the United States (pl/ for Poland later)
   us/states.py                   state codes, county code fixes (norm_fips)
   us/president/fetch_data.sh     raw sources -> data/raw/ (gitignored)
-  us/president/build_geo.sh      county shapes -> web/data/geo.json (needs mapshaper)
-  us/president/build_results.py  results + electoral votes -> web/data/results.json (stdlib only)
-  us/president/build_places.sh   Natural Earth populated places -> web/data/places.json (city
+  us/president/build_geo.sh      county shapes -> web/data/us/geo.json (needs mapshaper)
+  us/president/build_results.py  results + electoral votes -> web/data/us/results.json (stdlib only)
+  us/president/build_places.sh   Natural Earth populated places -> web/data/us/places.json (city
                                  labels: US cities projected like the map, largest first; mapshaper)
   us/congress/fetch_congress.sh  FEC, Clerk, MEDSL, Census, NC map -> data/raw/congress/
   us/congress/sources.py         shared readers: FEC spreadsheets, Clerk PDF text (pypdf), member IDs
-  us/congress/build_house_geo.sh district shapes -> web/data/house/plans-<year>.json + plans.json:
+  us/congress/build_house_geo.sh district shapes -> web/data/us/house/plans-<year>.json + plans.json:
                                  each state's map stored once (the year it first appeared), the
                                  index says which file each state uses per election (mapshaper;
                                  changed states measured by us/congress/house_plans.py)
-  us/congress/build_senate.py    -> web/data/senate.json (statewide, counties, seat history)
-  us/congress/build_house.py     -> web/data/house.json (435 districts per year)
+  us/congress/build_senate.py    -> web/data/us/senate.json (statewide, counties, seat history)
+  us/congress/build_house.py     -> web/data/us/house.json (435 districts per year)
   us/governor/fetch_governor.sh  MEDSL precinct returns 2018, 2022, 2024 -> data/raw/governor/
-  us/governor/build_governor.py  -> web/data/governor.json (statewide governor results per year)
+  us/governor/build_governor.py  -> web/data/us/governor.json (statewide governor results per year)
   us/photos/build_photos.py      photos/ originals -> web/img/candidates/*.jpg + photos.json;
                                  photos/parties/D.svg etc. -> web/img/parties/ + parties.json (Pillow)
   us/photos/fetch_portraits.py   official portraits of candidates who served -> photos/congress/
@@ -91,7 +97,8 @@ pipeline/                        run from the repository root: `uv run -m pipeli
   publish.sh                     upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
 web/index.html, style.css    the page; plain JS + D3 v7, no build step
 web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
-                             app.js on November 12, 2026): state, data (loading), format, rules
+                             app.js on November 12, 2026): site (language and country from the
+                             address), state, data (loading), format, rules
                              (election rules), colors, components (shared HTML pieces), map,
                              places, tooltip, legend, nav (year ribbon), panel, live, cards,
                              trail, finder, actions (render, select), theme, hash (links)
@@ -100,6 +107,7 @@ web/js/views/                one view per kind of race (president; statewide: Se
                              legend, panel, Races and History cards, year-ribbon result, headline
                              (views/index.js lists them). The rest of the page asks view(); a new
                              office or country adds a view instead of more if-chains (November 12, 2026)
+tools/serve.py                   the page on your computer, like Cloudflare serves it (port 8000)
 tools/check/check.sh             does the working tree draw what the last commit draws? 52 views
                                  and click sequences (check.html) recorded in headless Chromium,
                                  compared step by step; output in data/check/ (gitignored). Run
@@ -108,8 +116,9 @@ web/vendor/                      D3, topojson-client, Public Sans (vendored, lic
 photos/                          original candidate photos (gitignored)
 ```
 
-Run: `cd web && uv run python -m http.server 8000`. Python is managed with uv (pinned 3.14).
-Safari caches aggressively: reload with Cmd+Option+R after changes.
+Run: `uv run python tools/serve.py` (http://localhost:8000/en/usa/; serves web/ like Cloudflare, see
+Addresses below, and tells browsers to re-check files, so a normal reload shows changes).
+Python is managed with uv (pinned 3.14).
 
 ## Data rules (important)
 
@@ -192,7 +201,7 @@ pipeline/us/live/sources.py  readers: NC (precinct zip), Clarity (SC, IA: JSON +
                              FL (county extract), TX (statewide HTML), Enhanced Voting (GA, VA,
                              RI: Excel/CSV report), DE (JSON), SD (CSV), OR (page), civicAPI
 pipeline/common/fetch.py     polite fetching: every request goes through it
-pipeline/us/live/importer.py importer loop -> web/data/live/{senate,governor,house}.json (not
+pipeline/us/live/importer.py importer loop -> web/data/us/live/{senate,governor,house}.json (not
                              committed); --replay to test
 pipeline/us/live/manual.py   numbers or race calls typed in by hand -> data/live/ (not committed)
 LIVE-CHECKLIST.md            what to run and watch on election night
@@ -253,7 +262,7 @@ Rules agreed with the owner:
   page, matches the certified 2024 result exactly). Missouri refuses scripts. Tested against certified 2024 House
   results where the site keeps 2024: NC, SC, IA, FL, GA, VA, every contested district within
   0.5%. Florida's file is in the Windows character set (cp1252). Not yet: AZ, RI (report
-  names unknown until published). Written to web/data/live/house.json,
+  names unknown until published). Written to web/data/us/live/house.json,
   keyed "SS-DD" like house.json,
   drawn on the 2026 district map. Shown as leading only: civicAPI's calls are not used and 435
   hand calls are not realistic. Previous result only where the state kept its 2024 map.
@@ -264,11 +273,11 @@ Rules agreed with the owner:
   each office's file after every round that changed more than fetch times
   (data/live/snapshots/<office>/, 20-80 KB each). Not in --replay. Saving never stops the importer.
 - Live files, one per office (decided November 3, so a viewer re-reads only the office in view,
-  every 30 seconds): web/data/live/senate.json, governor.json, house.json, each
+  every 30 seconds): web/data/us/live/senate.json, governor.json, house.json, each
   {"office", "year", "updated", "races": {id: race}, "night"}; ids "GA-sen", "TX-gov", "13-05".
   The Senate file also has "not_up" (the balance); "night" (any votes yet, Senate calls) is
   repeated in every file for the year ribbon.
-- Race charts ("Through the night", added November 3): web/data/live/trail-<office>.json, built by
+- Race charts ("Through the night", added November 3): web/data/us/live/trail-<office>.json, built by
   pipeline/common/trail.py from the snapshots when the importer starts (a restart loses nothing)
   and extended every round. Per race: candidates in first-seen order, sources, and points
   [unix time, % counted, total, source index, votes...], added only when the numbers change and
@@ -294,7 +303,7 @@ Rules agreed with the owner:
   double surname (NY's "Joel Azumah" for Anabilah-Azumah). Florida moved election night to
   floridaelectionwatch.gov behind a Cloudflare bot check: not used (civicAPI instead).
 - Pickups: a called race won by the other party than last time (Senate seat history; governors
-  from web/data/governor.json, 2022, or 2024 for NH and VT). Seats with no earlier result are
+  from web/data/us/governor.json, 2022, or 2024 for NH and VT). Seats with no earlier result are
   left out, noted under the legend.
 - Runoff calls (added November 10, 2026): `call XX-N Name1 Name2 --runoff --by AP` records who
   advanced (Louisiana's House primary). Between parties: Runoff grey, undecided. Within one
@@ -318,7 +327,9 @@ pages for past years. Even years only for now (2021/2023 odd-year races later).
 
 pipeline/ was sorted into folders on November 11, 2026 (agreed November 3, postponed past election
 night): common/ for what any country uses, us/ by office; every build's output was checked
-byte-for-byte unchanged. Poland goes in pipeline/pl/; web/data/ gets country folders then too.
+byte-for-byte unchanged. Poland goes in pipeline/pl/. web/data/ has one folder per country
+since November 13, 2026 (web/data/us/, later web/data/pl/; the page picks it from the address, see
+COUNTRIES in web/js/site.js); web/img/ is still shared.
 
 Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland
 (PKW results down to gmina, live for the 2027 parliamentary election), more countries.

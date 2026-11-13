@@ -17,7 +17,7 @@ export function writeHash() {
   if (state.sel.type !== "nation") p.set("place", state.sel.id);
   if (state.seat !== "regular") p.set("seat", state.seat);
   if (state.firstRound) p.set("round", "november");
-  history.replaceState(null, "", "#" + p.toString());
+  history.replaceState(null, "", location.pathname + location.search + "#" + p.toString());
 }
 // early: read only the office and year, so their data can be loaded before the rest is checked
 export function readHash(early = false) {

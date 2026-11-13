@@ -47,7 +47,7 @@ export const selPath = g.append("path").attr("class", "selected");
 export const gBadges = g.append("g").attr("class", "ev-badges");
 // shift arrows: drawn in map coordinates, then scaled by 1/zoom so they keep their screen size
 export const gArrows = g.append("g").attr("class", "arrows");
-// city names (web/data/places.json, Natural Earth): on top, never catching clicks
+// city names (web/data/us/places.json, Natural Earth): on top, never catching clicks
 export const gPlaces = g.append("g").attr("class", "places");
 
 export const zoom = d3.zoom().scaleExtent([1, 32]).translateExtent([[0, 0], [W, H]])

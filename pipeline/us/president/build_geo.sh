@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds web/data/geo.json: US county shapes for the map.
+# Builds web/data/us/geo.json: US county shapes for the map.
 #
 # Layers in the output TopoJSON:
 #   counties  2019 Census counties (50 states + DC); Alaska merged into one shape (02000)
@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../../.."
 RAW=data/raw
 C2019=$RAW/c2019/cb_2019_us_county_500k.shp
 C2023=$RAW/c2023/cb_2023_us_county_500k.shp
-OUT=web/data/geo.json
+OUT=web/data/us/geo.json
 TMP=$(mktemp -d)
 
 # 50 states + DC (drops Puerto Rico and the territories)

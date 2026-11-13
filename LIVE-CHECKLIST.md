@@ -6,8 +6,8 @@ Times are Warsaw time (CET).
 
 1. Open two terminal windows in the project folder.
 2. Window 1, the page:
-   `cd web && uv run python -m http.server 8000`
-   then open http://localhost:8000/#race=senate&year=2026 in the browser
+   `uv run python tools/serve.py`
+   then open http://localhost:8000/en/usa/#race=senate&year=2026 in the browser
    (the governor races are under Governor).
 3. Window 2, the importer:
    `uv run -m pipeline.us.live.importer`

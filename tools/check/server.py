@@ -23,6 +23,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(CHECK)
             return
+        # like Cloudflare (web/_redirects): the language and country addresses get the page
+        path = self.path.split("?")[0]
+        if path.startswith(("/en/", "/pl/")) and not Path(self.translate_path(path)).is_file():
+            self.path = "/index.html"
         super().do_GET()
 
     def do_POST(self):

@@ -27,6 +27,9 @@ const VIEWS = [
   V("race=house&year=2026"), V("race=house&year=2026", { w: 390 }), V("race=house&year=2026", { theme: "dark" }),
   V("race=house&year=2026&place=22"), V("race=house&year=2026&place=22-05"), V("race=house&year=2026&place=22-05", { w: 390 }),
   V("race=house&year=2026&place=04"), V("race=house&year=2026&place=06"),
+  // the address: an old link at the root, the page's own address, an unknown one (web/js/site.js)
+  V("year=2020&view=shift&place=48", { path: "/" }), V("race=senate&year=2024&place=13", { path: "/en/usa/" }),
+  V("race=house&year=2024", { path: "/en/nowhere/" }),
 ];
 // clicks after opening a view: [selector, ...] clicked in order, the page recorded after each
 const C = (h, clicks) => ({ h, clicks });
@@ -59,7 +62,7 @@ async function grab(v) {
   if (v.sort) localStorage.setItem("raceSort", v.sort);
   f.style.width = (v.w || 1280) + "px";
   // the frame's load event, or 15 seconds at most (a stalled request must not stop the whole run)
-  await new Promise(r => { f.onload = r; setTimeout(r, 15000); f.src = "index.html?x=" + Math.random() + "#" + v.h; });
+  await new Promise(r => { f.onload = r; setTimeout(r, 15000); f.src = (v.path || "index.html") + "?x=" + Math.random() + "#" + v.h; });
   // drawn: the panel has content and the map has shapes (the code may still be loading at "load")
   for (let t = 0; t < 200; t++) {
     const d = f.contentDocument;
@@ -80,6 +83,7 @@ async function record(v, what) {
   const d = f.contentDocument, w = f.contentWindow;
   const pick = s => [...d.querySelectorAll(s)].map(e => e.outerHTML).join("");
   const res = [`title: ${d.title}`, what ? `## ${what} -> ${w.location.hash}` : `### ${JSON.stringify(v)}`];
+  if (v.path) res.push(`address: ${w.location.pathname}${w.location.hash}`);
   for (const s of ["#panel", "#races", "#history", "#legend", "#year-list", "#crumbs", "#headline", "#dek", ".map-tools", ".colophon", "#map .ev-badges", "#map .arrows", "#map defs", "#map .places"])
     res.push(`${s}: ${pick(s)}`);
   const key = p => p.__data__?.properties?.id ?? p.__data__?.properties?.st;

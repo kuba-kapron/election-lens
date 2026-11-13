@@ -1,4 +1,5 @@
 // City names on the map.
+import { site } from "./site.js";
 import { state } from "./state.js";
 import { H, W, projection } from "./data.js";
 import { stateOf } from "./rules.js";
@@ -78,7 +79,7 @@ export function starPath(r) {
 }
 // fetched once the page has started (the names are drawn on the first map)
 export function initPlaces() {
-  d3.json("data/places.json?v=2").then(d => { places = d.map(([name, st, pop, x, y, cap]) => ({ name, st, pop, cap: cap || 0, tier: placeTier(pop), p: projection([x, y]) })); drawPlaces(); })
+  d3.json(`${site.data}/places.json?v=2`).then(d => { places = d.map(([name, st, pop, x, y, cap]) => ({ name, st, pop, cap: cap || 0, tier: placeTier(pop), p: projection([x, y]) })); drawPlaces(); })
     .catch(() => { /* no labels */ });
   window.addEventListener("resize", () => { drawPlaces(); sizeStripes(); });
 }

@@ -1,6 +1,6 @@
 """Each race's path through the night, for the charts in the race panels.
 
-    web/data/live/trail-<office>.json = {"office", "updated", "races": {id: {
+    web/data/us/live/trail-<office>.json = {"office", "updated", "races": {id: {
         "cands": ["Jon Ossoff", "Mike Collins", ...],   # first-seen order, never reordered
         "srcs": ["civicAPI", "Georgia Secretary of State"],
         "pts": [[unix seconds, pct counted or null, total, source index, votes per cand...], ...]}}}
@@ -31,7 +31,7 @@ class Trail:
         self.updated = None
 
     def add(self, data, t):
-        """Add one office file's numbers (as written to web/data/live/<office>.json) at time t."""
+        """Add one office file's numbers (as written to web/data/us/live/<office>.json) at time t."""
         for rid, r in (data.get("races") or {}).items():
             rd = (r.get("rounds") or [None])[0]
             if not rd or not rd.get("total") or (r.get("test") and not self.test):
