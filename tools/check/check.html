@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>check</title>
+<!-- Records what the page draws in many views and after clicks (HTML of the panel and cards,
+     map fills, hover boxes) and posts it to server.py. Run with tools/check/check.sh.
+     Add a view: V("<link after #>", { theme, w (frame width), sort }); add clicks: C(link, [selectors]). -->
+<body>
+<iframe id="f" style="width:1280px;height:900px;border:0"></iframe>
+<pre id="out"></pre>
+<script>
+const V = (h, o = {}) => ({ h, ...o });
+const VIEWS = [
+  V(""), V("", { theme: "dark" }), V("", { w: 390 }),
+  V("year=2024&color=margin"), V("year=2024&map=counties"), V("year=2020&view=shift&arrows=on"),
+  V("year=2020&view=shift&map=counties&arrows=on&place=48"), V("year=2000&place=12"), V("year=2016&place=48201"),
+  V("year=2024&place=23"), V("year=2024&place=02"),
+  V("race=senate&year=2024"), V("race=senate&year=2024", { theme: "dark" }), V("race=senate&year=2020&color=margin"),
+  V("race=senate&year=2020&place=13"), V("race=senate&year=2020&place=13", { w: 390 }), V("race=senate&year=2020&place=13&round=november"),
+  V("race=senate&year=2020&round=november"), V("race=senate&year=2020&place=13&seat=special"), V("race=senate&year=2022&place=13121"),
+  V("race=senate&year=2022&place=02"), V("race=senate&year=2022&map=counties"),
+  V("race=house&year=2024"), V("race=house&year=2024", { sort: "close" }), V("race=house&year=2022&color=margin"),
+  V("race=house&year=2022&place=06"), V("race=house&year=2024&place=06-12"), V("race=house&year=2022&place=02&round=november"),
+  V("race=house&year=2020&place=22-05&round=november"), V("race=house&year=2024&place=50"),
+  V("race=senate&year=2026"), V("race=senate&year=2026", { sort: "spectrum-r" }), V("race=senate&year=2026", { theme: "dark" }),
+  V("race=senate&year=2026&place=13"), V("race=senate&year=2026&place=13121"), V("race=senate&year=2026&color=margin"),
+  V("race=governor&year=2026"), V("race=governor&year=2026&place=48"),
+  V("race=house&year=2026"), V("race=house&year=2026", { w: 390 }), V("race=house&year=2026", { theme: "dark" }),
+  V("race=house&year=2026&place=22"), V("race=house&year=2026&place=22-05"), V("race=house&year=2026&place=22-05", { w: 390 }),
+  V("race=house&year=2026&place=04"), V("race=house&year=2026&place=06"),
+];
+// clicks after opening a view: [selector, ...] clicked in order, the page recorded after each
+const C = (h, clicks) => ({ h, clicks });
+VIEWS.push(
+  C("", ['[data-mode="margin"]', '[data-mode="shift"]', '#arrows', '[data-level="counties"]', '[data-mode="winner"]', '#theme']),
+  C("race=senate&year=2020", ['[data-cmap="margin"]', '[data-cmap="winner"]', '[data-round="november"]', '[data-race-st="13"][data-race-seat="special"]', '.tabs [data-seat="regular"]', '[data-round="final"]']),
+  C("race=house&year=2026&place=22-05", ['[data-crumb="1"]', '[data-crumb="0"]', '[data-race-st]']),
+  C("race=senate&year=2026", ['[data-race-st="13"]', '[data-crumb="0"]']),
+  C("race=house&year=2024", ['[data-go="district:06-12"]', '[data-hist="2022"]', '.years-step[data-step="1"]', '[data-office="senate"]', '[data-office="governor"]']),
+  C("race=house&year=2026", ['[data-hist-mode="pop"]', '[data-hist-mode="seats"]', '[data-cmap="margin"]']),
+);
+const only = new URLSearchParams(location.search).get("only");
+if (only) VIEWS.splice(0, VIEWS.length, ...VIEWS.filter(v => JSON.stringify(v) === only));
+const f = document.getElementById("f"), wait = ms => new Promise(r => setTimeout(r, ms));
+// wait until the map stops moving (zoom transitions) and the page is quiet
+async function settle() {
+  await wait(800);
+  let last = null;
+  for (let t = 0; t < 100; t++) {
+    const d = f.contentDocument, now = (d.querySelector("#map > g")?.getAttribute("transform") || "") + d.getElementById("panel").innerHTML.length;
+    if (now === last) break;
+    last = now;
+    await wait(400);
+  }
+  await wait(300);
+}
+async function grab(v) {
+  localStorage.clear();
+  if (v.theme) localStorage.setItem("theme", v.theme);
+  if (v.sort) localStorage.setItem("raceSort", v.sort);
+  f.style.width = (v.w || 1280) + "px";
+  // the frame's load event, or 15 seconds at most (a stalled request must not stop the whole run)
+  await new Promise(r => { f.onload = r; setTimeout(r, 15000); f.src = "index.html?x=" + Math.random() + "#" + v.h; });
+  // drawn: the panel has content and the map has shapes (the code may still be loading at "load")
+  for (let t = 0; t < 200; t++) {
+    const d = f.contentDocument;
+    if (d.querySelector("#panel .panel-top") && d.querySelector("#map path.state-fill, #map path.district")) break;
+    await wait(100);
+  }
+  await settle();
+  const parts = [await record(v, "")];
+  for (const c of v.clicks || []) {
+    const el = f.contentDocument.querySelector(c);
+    if (el) el.dispatchEvent(new f.contentWindow.MouseEvent("click", { bubbles: true }));
+    await settle();
+    parts.push(await record(v, `click ${c}${el ? "" : " (not found)"}`));
+  }
+  return parts.join("\n");
+}
+async function record(v, what) {
+  const d = f.contentDocument, w = f.contentWindow;
+  const pick = s => [...d.querySelectorAll(s)].map(e => e.outerHTML).join("");
+  const res = [`title: ${d.title}`, what ? `## ${what} -> ${w.location.hash}` : `### ${JSON.stringify(v)}`];
+  for (const s of ["#panel", "#races", "#history", "#legend", "#year-list", "#crumbs", "#headline", "#dek", ".map-tools", ".colophon", "#map .ev-badges", "#map .arrows", "#map defs", "#map .places"])
+    res.push(`${s}: ${pick(s)}`);
+  const key = p => p.__data__?.properties?.id ?? p.__data__?.properties?.st;
+  const paths = [...d.querySelectorAll("#map path.county, #map path.state-fill, #map path.district")];
+  res.push("fills: " + paths.map(p => `${key(p)}=${p.getAttribute("fill")}${p.classList.contains("dim") ? "d" : ""}${p.classList.contains("pickable") ? "p" : ""}${p.style.display}`).join(" "));
+  res.push(`groups: ${[...d.querySelectorAll("#map > g > g")].map(g => g.style.display).join(",")} sel=${d.querySelector("#map path.selected")?.getAttribute("d")?.length}`);
+  const tip = d.getElementById("tip");
+  const sample = [...d.querySelectorAll("#map path.state-fill")].filter((_, i) => i % 3 === 0)
+    .concat([...d.querySelectorAll("#map path.county")].filter((_, i) => i % 97 === 0), [...d.querySelectorAll("#map path.district")].filter((_, i) => i % 13 === 0));
+  for (const p of sample) {
+    const r = p.getBoundingClientRect();
+    p.dispatchEvent(new w.MouseEvent("mousemove", { bubbles: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 }));
+    res.push(`tip ${key(p)}: ${tip.hidden ? "(hidden)" : tip.innerHTML}`);
+  }
+  return res.join("\n");
+}
+(async () => {
+  const out = [];
+  for (const v of VIEWS) {
+    let r;
+    try { r = await grab(v); } catch (e) { r = `### ${JSON.stringify(v)}\nERROR ${e}`; }
+    await fetch("/view", { method: "POST", body: r + "\n" });
+  }
+  await fetch("/end", { method: "POST", body: "### END\n" });
+})();
+</script>

@@ -100,6 +100,10 @@ web/js/views/                one view per kind of race (president; statewide: Se
                              legend, panel, Races and History cards, year-ribbon result, headline
                              (views/index.js lists them). The rest of the page asks view(); a new
                              office or country adds a view instead of more if-chains (November 12, 2026)
+tools/check/check.sh             does the working tree draw what the last commit draws? 52 views
+                                 and click sequences (check.html) recorded in headless Chromium,
+                                 compared step by step; output in data/check/ (gitignored). Run
+                                 after changes that should not change the US pages; ~4 minutes
 web/vendor/                      D3, topojson-client, Public Sans (vendored, licenses in README there)
 photos/                          original candidate photos (gitignored)
 ```
