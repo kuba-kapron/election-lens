@@ -1,4 +1,5 @@
 // Loading the data files, the elections each race has, map shapes and projection.
+import { t } from "./texts.js";
 import { site } from "./site.js";
 import { state } from "./state.js";
 
@@ -16,7 +17,7 @@ export const [geo, data, photoList, partyIcons, congressList, peoplePhotos] = aw
 export function failed(err) {
   console.error(err);
   document.getElementById("panel").innerHTML =
-    `<p class="empty">The map data could not be loaded. Serve the web folder over HTTP (for example <code>python3 -m http.server</code>) instead of opening the file directly.</p>`;
+    `<p class="empty">${t("noData")}</p>`;
 }
 export const congressPhotos = new Set(congressList);
 export const photos = new Set(photoList);

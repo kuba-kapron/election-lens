@@ -49,6 +49,12 @@ US presidential results 2000–2024 on one static page (`web/`):
   any other one (`/`, old links) is shown as `/en/usa/` with what follows it kept. File paths in
   the page start at the root (`/data/...`), not relative: a `<base>` tag would break the map's
   `url(#flip-dem)` stripes in some browsers.
+- Languages (decided November 13, 2026): every text the page shares goes through t() in
+  web/js/texts.js (index.html: data-t), with number formats; each country's view writes its labels
+  through t() from the start. The US views' texts stay in English in the code until the US pages
+  are translated. Poland: English first (/en/poland/), then Polish (/pl/poland/). In English,
+  voivodeships and cities that have an English name are translated (Lower Silesian, Warsaw);
+  other place names stay Polish.
 - Shareable links: `#year=2024&view=shift&map=counties&color=margin&arrows=on&place=48201`.
   Defaults are left out of the link; old `#2024/margin/48201` and `vote=popular` (opens
   Margin) links still work.
@@ -98,7 +104,8 @@ pipeline/                        run from the repository root: `uv run -m pipeli
 web/index.html, style.css    the page; plain JS + D3 v7, no build step
 web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
                              app.js on November 12, 2026): site (language and country from the
-                             address), state, data (loading), format, rules
+                             address), texts (the page's texts per
+                             language, t("key")), state, data (loading), format, rules
                              (election rules), colors, components (shared HTML pieces), map,
                              places, tooltip, legend, nav (year ribbon), panel, live, cards,
                              trail, finder, actions (render, select), theme, hash (links)

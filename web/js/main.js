@@ -7,7 +7,9 @@ import { initPlaces } from "./places.js";
 import { render, select, setCmap, setLevel, setMode, setOffice, setYear } from "./actions.js";
 import { readHash } from "./hash.js";
 import "./theme.js";  // the light / dark switch
+import { applyTexts } from "./texts.js";
 
+applyTexts();  // the page frame in the page's language
 try {
   readHash(true);
   // the Senate file labels midterm years in the ribbon; the live file labels 2026

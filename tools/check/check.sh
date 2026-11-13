@@ -6,8 +6,10 @@
 # For changes that should look the same (cleanups, a new country next to the US pages). After an
 # intended change, read the differences: the new recording is the next baseline once committed.
 # Output in data/check/ (gitignored). The baseline is reused while HEAD and the live files stay
-# the same. Keeps the Mac awake while it runs (caffeinate).
+# the same. Keeps the Mac awake while it runs (caffeinate; not with the lid closed).
 set -u
+# keep the Mac awake for the whole run (both recordings), not one recording at a time
+[ -z "${CHECK_AWAKE:-}" ] && CHECK_AWAKE=1 exec caffeinate -i "$0" "$@"
 cd "$(dirname "$0")/../.."
 OUT=data/check
 mkdir -p "$OUT"
@@ -24,10 +26,10 @@ if [ "$(cat "$OUT/base.key" 2>/dev/null)" != "$KEY" ]; then
   for d in "$OUT/base-web/data/us" "$OUT/base-web/data"; do
     [ -d "$d" ] && { rm -rf "$d/live"; [ -d web/data/us/live ] && ln -s "$PWD/web/data/us/live" "$d/live"; break; }
   done
-  caffeinate -i tools/check/record.sh "$OUT/base.txt" "$OUT/base-web" ${1:+"$1"} || exit 1
+  tools/check/record.sh "$OUT/base.txt" "$OUT/base-web" ${1:+"$1"} || exit 1
   echo "$KEY" > "$OUT/base.key"
 fi
 echo "recording the working tree..."
-caffeinate -i tools/check/record.sh "$OUT/new.txt" web ${1:+"$1"} || exit 1
+tools/check/record.sh "$OUT/new.txt" web ${1:+"$1"} || exit 1
 [ "$(live_md5)" = "$(cut -d' ' -f2 "$OUT/base.key")" ] || echo "WARNING: live files changed during the run: run again"
 uv run python tools/check/compare.py "$OUT/base.txt" "$OUT/new.txt"

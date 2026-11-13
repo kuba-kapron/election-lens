@@ -1,4 +1,5 @@
 // The Races and History cards under the map.
+import { t } from "./texts.js";
 import { state, ui } from "./state.js";
 import { LIVE_YEAR, data } from "./data.js";
 import { ARROW, CHECK, attr, fold, markSpan } from "./format.js";
@@ -13,7 +14,7 @@ export function liveRowParts(r) {
   // a runoff: both people, one per line (each shortens to fit, with the party), → in the status column
   const who = called ? personCell(r.cands[r.call.winner]) : ro ? ro.map(c => `<span class="who-line">${personCell(c)}</span>`).join("")
     : l ? personCell(r.cands[l.lead]) : `<span class="muted">${liveStatus(r)}</span>`;
-  const status = called ? markSpan(CHECK, "won")
+  const status = called ? markSpan(CHECK, t("srWon"))
     : ro ? markSpan(ARROW, "runoff", attr(runoffText(r)))
     : l ? `<span class="muted">${pctText(r).replace(/ of .*| counted/, "")}</span>` : "";
   return { who, status, lean: l ? leanLabel(l) : "" };
@@ -37,9 +38,9 @@ export function raceList(title, items, firstLabel = "A–Z", cls = "") {
     || (grp(a) === 0 ? by(a, b) : grp(a) === 2 ? Date.parse(a.close) - Date.parse(b.close) : 0) || a.i - b.i);
   // every order spelled out in one dropdown (the phone's own picker on phones)
   const districts = firstLabel === "1st–";
-  const opts = [["az", districts ? "1st–last" : "A–Z"], ["az-r", districts ? "Last–1st" : "Z–A"], ["close", "Closest first"], ["close-r", "Widest first"],
+  const opts = [["az", t(districts ? "firstLast" : "az")], ["az-r", t(districts ? "lastFirst" : "za")], ["close", t("closest")], ["close-r", t("widest")],
     ["spectrum", "Most Democratic first"], ["spectrum-r", "Most Republican first"]];
-  const sw = `<label class="list-sort">Sort <select data-sort>${opts.map(([k, label]) =>
+  const sw = `<label class="list-sort">${t("sort")} <select data-sort>${opts.map(([k, label]) =>
     `<option value="${k}"${k === ui.raceSort || (k === "az" && !opts.some(o => o[0] === ui.raceSort)) ? " selected" : ""}>${label}</option>`).join("")}</select></label>`;
   // long lists: the first LIST_CAP rows and "Show all"; opened when the place in view is further
   // down, so its marked row is never hidden. A filter field searches the whole list
@@ -48,9 +49,9 @@ export function raceList(title, items, firstLabel = "A–Z", cls = "") {
   const curAt = sorted.findIndex(x => x.html.includes('aria-current="true"'));
   const open = listView.open || curAt >= LIST_CAP;
   const rows = sorted.map((x, i) => x.html.replace("<li>", `<li data-q="${attr(searchText(x.html))}"${i >= LIST_CAP ? ' class="more"' : ""}>`)).join("");
-  const search = long ? `<input type="search" class="list-search" placeholder="Filter" aria-label="Filter ${attr(title)}" value="${attr(listView.q)}">` : "";
-  const more = long ? `<button type="button" class="quiet list-more" aria-expanded="${open}" data-n="${sorted.length}">${open ? "Show fewer" : `Show all ${sorted.length}`}</button>` : "";
-  return `<div class="races-head"><h3>${title}</h3>${search}${sw}</div><ul class="race-list${cls ? ` ${cls}` : ""}${open ? " open" : ""}">${rows}</ul><p class="empty list-none" hidden>No matches.</p>${more}`;
+  const search = long ? `<input type="search" class="list-search" placeholder="${t("filter")}" aria-label="${attr(t("filterList", title))}" value="${attr(listView.q)}">` : "";
+  const more = long ? `<button type="button" class="quiet list-more" aria-expanded="${open}" data-n="${sorted.length}">${open ? t("showFewer") : t("showAll", sorted.length)}</button>` : "";
+  return `<div class="races-head"><h3>${title}</h3>${search}${sw}</div><ul class="race-list${cls ? ` ${cls}` : ""}${open ? " open" : ""}">${rows}</ul><p class="empty list-none" hidden>${t("noMatches")}</p>${more}`;
 }
 export const LIST_CAP = 40;
 export const listView = { key: null, open: false, q: "" };  // per list: opened, filter text; reset when the list changes
@@ -82,7 +83,7 @@ export function raceItem(r, label, go, cur) {
 // one county of a race: its leader and margin; tonight also the share counted
 export function countyItem(r, fips) {
   const n = r.cands.length, v = r.counties[fips], l = v && v[n + 1] ? countyLean(r, fips) : null, cp = r.county_pct?.[fips];
-  const who = l ? personCell(r.cands[l.lead]) : `<span class="muted">No votes yet</span>`;
+  const who = l ? personCell(r.cands[l.lead]) : `<span class="muted">${t("noVotesYet")}</span>`;
   const status = isLive() && l && cp != null ? `<span class="muted">${Math.round(cp)}%</span>` : "";
   return { m: l ? signedMargin(l) : null, group: l ? 0 : 1, fips,
     html: raceRow(`data-go="county:${fips}"`, countyLabel(fips), who, status, l ? leanLabel(l) : "") };
@@ -137,7 +138,7 @@ export function historyCard() {
   // a chart once there are two elections to compare; country charts switch between seats (or
   // electoral votes) and the popular-vote margin, starting from what the map shows
   const chart = pts.length > 1 ? barChart(pts, title) : "";
-  const sw = chart && s.type === "nation" ? `<div class="mode" role="radiogroup" aria-label="Chart">${[["seats", v.seatsLabel], ["pop", "Popular vote"]].map(([k, label]) =>
+  const sw = chart && s.type === "nation" ? `<div class="mode" role="radiogroup" aria-label="${t("chart")}">${[["seats", v.seatsLabel], ["pop", t("popularVote")]].map(([k, label]) =>
     `<button type="button" role="radio" aria-checked="${(k === "seats") === seatsChart}" data-hist-mode="${k}">${label}</button>`).join("")}</div>` : "";
   return `<div class="races-head"><h3>${title}</h3>${sw}</div>${chart ? `<div class="hist-body">${chart}${list}</div>` : list}`;
 }

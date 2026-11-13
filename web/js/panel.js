@@ -1,4 +1,5 @@
 // The results panel and the breadcrumb.
+import { t } from "./texts.js";
 import { state, ui } from "./state.js";
 import { data } from "./data.js";
 import { fmtInt } from "./format.js";
@@ -45,7 +46,7 @@ export function drawPanel() {
   racesEl.querySelector(".list-more")?.addEventListener("click", e => {
     listView.open = racesEl.querySelector(".race-list").classList.toggle("open");
     e.target.setAttribute("aria-expanded", listView.open);
-    e.target.textContent = listView.open ? "Show fewer" : `Show all ${e.target.dataset.n}`;
+    e.target.textContent = listView.open ? t("showFewer") : t("showAll", e.target.dataset.n);
     // collapsing from far down the list: bring the card's top back into view
     if (!listView.open && racesEl.getBoundingClientRect().top < 0) racesEl.scrollIntoView({ block: "start" });
   });

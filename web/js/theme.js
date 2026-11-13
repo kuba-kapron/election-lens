@@ -1,4 +1,5 @@
 // The light / dark switch.
+import { t } from "./texts.js";
 import { readColors } from "./colors.js";
 import { render } from "./actions.js";
 
@@ -13,7 +14,7 @@ themeBtn.innerHTML = `<span class="thumb"></span><span class="seg sun">${SUN}</s
 export function drawThemeButton() {
   const dark = currentTheme() === "dark";
   themeBtn.setAttribute("aria-checked", String(dark));
-  themeBtn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  themeBtn.title = t(dark ? "toLight" : "toDark");
 }
 export function refreshColors() { readColors(); render({ map: true, panel: true }); drawThemeButton(); }
 themeBtn.addEventListener("click", () => {

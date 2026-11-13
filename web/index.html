@@ -25,31 +25,31 @@
           <li><a role="menuitem" href="/en/usa/" aria-current="true"><span class="flag-box"><span class="flag-frame"><img class="flag" src="/img/flags/us.svg?v=2" alt=""></span></span>United States</a></li>
         </ul>
       </div>
-      <nav class="site-nav" role="radiogroup" aria-label="Race">
+      <nav class="site-nav" role="radiogroup" aria-label="Race" data-t="aria-label:race">
         <button type="button" role="radio" aria-checked="true" data-office="president">President</button>
         <button type="button" role="radio" aria-checked="false" data-office="senate">Senate</button>
         <button type="button" role="radio" aria-checked="false" data-office="house">House</button>
         <button type="button" role="radio" aria-checked="false" data-office="governor">Governor</button>
       </nav>
-      <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode"></button>
+      <button type="button" id="theme" class="theme-toggle" role="switch" aria-label="Dark mode" data-t="aria-label:darkMode"></button>
     </div>
     <h1 id="headline">How America voted, <span class="nowrap">2000 to 2024</span></h1>
     <p class="dek" id="dek">Every presidential election since 2000, from the Electoral College down to the county. Click a state to see its counties, and a county to see how it has voted over time.</p>
   </header>
 
-  <nav class="years" aria-label="Election year">
-    <button type="button" class="years-step" data-step="-1" aria-label="Earlier election">‹</button>
+  <nav class="years" aria-label="Election year" data-t="aria-label:electionYear">
+    <button type="button" class="years-step" data-step="-1" aria-label="Earlier election" data-t="aria-label:earlier">‹</button>
     <ol id="year-list"></ol>
-    <button type="button" class="years-step" data-step="1" aria-label="Later election">›</button>
+    <button type="button" class="years-step" data-step="1" aria-label="Later election" data-t="aria-label:later">›</button>
   </nav>
 
   <main class="stage">
-    <section class="map-wrap" aria-label="Map">
+    <section class="map-wrap" aria-label="Map" data-t="aria-label:map">
       <div class="map-tools">
-        <div class="mode" role="radiogroup" aria-label="Map shows">
-          <button type="button" role="radio" aria-checked="true" data-mode="winner" title="Who won each state: solid if the party held it, striped if it flipped">Winner</button>
-          <button type="button" role="radio" aria-checked="false" data-mode="margin" title="Who won and by how much">Margin</button>
-          <button type="button" role="radio" aria-checked="false" data-mode="shift" title="How far the margin moved since the previous election">Shift</button>
+        <div class="mode" role="radiogroup" aria-label="Map shows" data-t="aria-label:mapShows">
+          <button type="button" role="radio" aria-checked="true" data-mode="winner" title="Who won each state: solid if the party held it, striped if it flipped" data-t="winner">Winner</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="margin" title="Who won and by how much" data-t="margin">Margin</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="shift" title="How far the margin moved since the previous election" data-t="shift">Shift</button>
         </div>
         <button type="button" id="arrows" class="chip" aria-pressed="false" title="Show the shift as arrows" hidden>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12L12 5M7.5 4.5L12 5L11.4 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -59,16 +59,16 @@
           <button type="button" role="radio" aria-checked="true" data-level="states">States</button>
           <button type="button" role="radio" aria-checked="false" data-level="counties">Counties</button>
         </div>
-        <div class="mode" role="radiogroup" aria-label="Color races by" id="cmap-toggle" hidden>
-          <button type="button" role="radio" aria-checked="true" data-cmap="winner" title="Solid once a race is won or called; stripes where the seat changed party">Winner</button>
-          <button type="button" role="radio" aria-checked="false" data-cmap="margin" title="Every race shaded by its margin">Margin</button>
+        <div class="mode" role="radiogroup" aria-label="Color races by" data-t="aria-label:colorBy" id="cmap-toggle" hidden>
+          <button type="button" role="radio" aria-checked="true" data-cmap="winner" title="Solid once a race is won or called; stripes where the seat changed party" data-t="winner">Winner</button>
+          <button type="button" role="radio" aria-checked="false" data-cmap="margin" title="Every race shaded by its margin" data-t="margin">Margin</button>
         </div>
         <div class="mode" role="radiogroup" aria-label="Round" id="round-toggle" hidden>
           <button type="button" role="radio" aria-checked="false" data-round="november" title="Every race as counted in November: races that went to a runoff or a ranked-choice count had no winner yet">November</button>
           <button type="button" role="radio" aria-checked="true" data-round="final" title="Every race as it was decided: runoffs and ranked-choice counts included">Final</button>
         </div>
       </div>
-      <nav class="crumbs" id="crumbs" aria-label="Where the map is"></nav>
+      <nav class="crumbs" id="crumbs" aria-label="Where the map is" data-t="aria-label:whereMap"></nav>
       <svg id="map" role="img" aria-label="Map of US counties colored by result"></svg>
       <div id="legend" class="legend"></div>
       <div id="tip" class="tip" hidden></div>
@@ -77,8 +77,8 @@
     <aside class="panel" id="panel" aria-live="polite"></aside>
   </main>
   <!-- outside the stage, so the sticky panel stops above it -->
-  <section class="races" id="races" aria-label="Races" hidden></section>
-  <section class="races" id="history" aria-label="Earlier elections" hidden></section>
+  <section class="races" id="races" aria-label="Races" data-t="aria-label:races" hidden></section>
+  <section class="races" id="history" aria-label="Earlier elections" data-t="aria-label:earlierElections" hidden></section>
 
   <footer class="colophon">
     <!-- data-src: the views a line belongs to (president, senate, house, live); lines without it always show -->
@@ -91,7 +91,7 @@
     <p data-src="senate house live">Portraits of members of Congress: official portraits (public domain) via <a href="https://github.com/unitedstates/images">unitedstates/images</a>.</p>
     <p>City names: <a href="https://www.naturalearthdata.com/">Natural Earth</a> (public domain).</p>
     <p>Party icons from Wikimedia Commons: Democratic and Republican public domain; <a href="https://commons.wikimedia.org/wiki/File:Libertarian_Disc.svg">Libertarian</a> by Hdebug (original by Lance W. Haverkamp) and <a href="https://commons.wikimedia.org/wiki/File:Green_Disc.svg">Green</a> by Gappalachia, both <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</p>
-    <p>Election Lens is open source under the AGPL-3.0 license.</p>
+    <p data-t="license">Election Lens is open source under the AGPL-3.0 license.</p>
   </footer>
 
   <script src="/vendor/d3.min.js"></script>
