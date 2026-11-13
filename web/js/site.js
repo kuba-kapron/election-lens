@@ -3,15 +3,17 @@
 // in every language. One index.html serves them all (web/_redirects on Cloudflare,
 // tools/serve.py locally); the settings after # stay as they were.
 export const LANGS = ["en"];
-// each country: its data folder (pipeline/<code>/ writes web/data/<code>/)
-export const COUNTRIES = { usa: { data: "/data/us" } };
+// each country: its code (its code in web/js/<code>/, its data in web/data/<code>/, written by
+// pipeline/<code>/)
+export const COUNTRIES = { usa: { code: "us" } };
 
 const [, lang, country] = location.pathname.split("/");
 export const site = {
   lang: LANGS.includes(lang) ? lang : "en",
   country: Object.hasOwn(COUNTRIES, country) ? country : "usa",
 };
-site.data = COUNTRIES[site.country].data;
+site.code = COUNTRIES[site.country].code;
+site.data = `/data/${site.code}`;
 // any other address (/, /index.html, old links like /#year=2024&place=48) shows the page's own,
 // keeping what follows it
 const own = `/${site.lang}/${site.country}/`;

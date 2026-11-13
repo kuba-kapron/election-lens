@@ -1,8 +1,8 @@
 // Shareable links.
-import { state } from "./state.js";
-import { HAS, LIVE_YEAR, OFFICES, curYears, data, officeFor } from "./us/data.js";
-import { houseRaces } from "./us/rules.js";
-import { view } from "./us/views/index.js";
+import { state } from "../state.js";
+import { view } from "../country.js";
+import { HAS, LIVE_YEAR, OFFICES, curYears, data, officeFor } from "./data.js";
+import { houseRaces } from "./rules.js";
 
 // shareable links: #race=senate&year=2024&view=shift&map=counties&vote=popular&place=48201
 // defaults (president, margin, states, ec, regular seat) are left out of the link

@@ -3,10 +3,12 @@ import { state } from "../../state.js";
 import { data, path, stateById, years } from "../data.js";
 import { WIN_MARK, fmtInt, pct, possessive } from "../../format.js";
 import { SINGLE, byCount, ec, evOf, flippedFrom, margin, prevYear, record, shift, signedMargin, stateOf, wonBy } from "../rules.js";
-import { BINS, categorical, color, colors, stateFill, value } from "../../colors.js";
-import { candRow, countyName, evRow, fullName, headline, leanLabel, mlabel, noDataReason, partyTag, personCell, placeName, popSection, raceRow } from "../../components.js";
-import { badgeMarks, countyPaths, countyTarget, statePaths, withNewConnecticut } from "../../map.js";
-import { byName, countyLabel, marginBar, popBar, seatBar } from "../../cards.js";
+import { BINS, categorical, color, colors, stateFill, value } from "../colors.js";
+import { raceRow } from "../../components.js";
+import { candRow, countyName, evRow, fullName, headline, leanLabel, mlabel, noDataReason, partyTag, personCell, placeName, popSection } from "../components.js";
+import { badgeMarks } from "../../map.js";
+import { countyPaths, countyTarget, statePaths, withNewConnecticut } from "../map.js";
+import { byName, countyLabel, marginBar, popBar, seatBar } from "../cards.js";
 
 export const presidentView = {
   districts: false,

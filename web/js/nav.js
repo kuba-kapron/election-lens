@@ -1,10 +1,6 @@
-// The year ribbon and the country menu.
+// The year ribbon and the country menu (the years and their colors come from the country).
 import { state } from "./state.js";
-import { LIVE_YEAR, curYears } from "./us/data.js";
-import { ckey, colors } from "./colors.js";
-import { liveTag } from "./components.js";
-import { setYear } from "./actions.js";
-import { view } from "./us/views/index.js";
+import { country, view } from "./country.js";
 
 // One row of the race's years, scrolling sideways when they do not fit. Under each year a thin
 // bar in the winner's color (the Electoral College winner; the Senate or House majority);
@@ -14,25 +10,26 @@ export const yearList = d3.select("#year-list"), yearOl = document.getElementByI
 export const yearResult = y => view().yearResult(y);
 // how many years are in view: as many whole ones as fit at --year-min (CSS), at most all of them
 export function sizeYears() {
+  if (!country) return;  // the ribbon is measured once the country is known
   const min = parseFloat(getComputedStyle(yearOl).getPropertyValue("--year-min")) || 100;
-  const n = Math.max(1, Math.min(curYears().length, Math.floor(yearOl.clientWidth / min)));
+  const n = Math.max(1, Math.min(country.years().length, Math.floor(yearOl.clientWidth / min)));
   yearOl.style.setProperty("--years-in-view", n);
 }
 new ResizeObserver(() => { sizeYears(); }).observe(yearOl.parentElement);
 export function drawYears() {
-  const ys = curYears();
+  const ys = country.years();
   sizeYears();
   yearList.selectAll("li").data(ys, y => y).join(enter => {
     const li = enter.append("li");
-    li.append("button").attr("type", "button").on("click", (e, y) => setYear(y));
+    li.append("button").attr("type", "button").on("click", (e, y) => country.setYear(y));
     return li;
   }).select("button")
     .attr("aria-current", y => String(y === state.year))
     .each(function (y) {
       const r = yearResult(y);
       this.title = r.text;
-      const bar = r.party ? `<i class="yr-bar${r.light ? " light" : ""}" style="background:${colors[ckey(r.party) + "Solid"]}"></i>` : `<i class="yr-bar none"></i>`;
-      this.innerHTML = `<span class="yr">${y}${bar}</span>${y === LIVE_YEAR ? liveTag() : ""}`;
+      const bar = r.party ? `<i class="yr-bar${r.light ? " light" : ""}" style="background:${country.yearFill(r)}"></i>` : `<i class="yr-bar none"></i>`;
+      this.innerHTML = `<span class="yr">${y}${bar}</span>${country.yearTag?.(y) ?? ""}`;
     });
   // ‹ ›: the previous or next year of this race
   const i = ys.indexOf(state.year);
@@ -46,8 +43,8 @@ export function drawYears() {
   }
 }
 document.querySelectorAll(".years-step").forEach(b => b.addEventListener("click", () => {
-  const ys = curYears(), y = ys[ys.indexOf(state.year) + +b.dataset.step];
-  if (y) setYear(y);
+  const ys = country.years(), y = ys[ys.indexOf(state.year) + +b.dataset.step];
+  if (y) country.setYear(y);
 }));
 // the country menu: one country for now
 {

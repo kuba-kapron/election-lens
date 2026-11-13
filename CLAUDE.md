@@ -110,19 +110,25 @@ pipeline/                        run from the repository root: `uv run -m pipeli
                                  voivodeship, country; checked against PKW's gmina table and totals
   publish.sh                     upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
 web/index.html, style.css    the page; plain JS + D3 v7, no build step
-web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
-                             app.js on November 12, 2026): site (language and country from the
-                             address), texts (the page's texts per language, t("key")), state,
-                             format, colors, components (shared HTML pieces), map, tooltip,
-                             legend, nav (year ribbon), panel, cards, finder, actions (render,
-                             select), theme, hash (links)
-web/js/us/                   the US-only code (moved November 13, 2026): data (loading), rules
-                             (election rules), live, trail, places (city labels), and views/:
+web/js/                      the page's code as ES modules (split from one app.js on November 12,
+                             2026). The files directly in web/js/ are shared by every country and
+                             never import a country's folder (November 13, 2026): main (loads the
+                             country, then draws), site (language and country from the address),
+                             country (the country description's contract: map, levels, years,
+                             finder, links; and view()), texts (t("key")), state, format,
+                             components (candidate rows, bars, portraits, list rows), map (SVG,
+                             zoom, hover, clicks), tooltip, legend, nav (year ribbon), panel,
+                             cards, finder, actions (render, select), theme
+web/js/us/                   the United States: country.js (its description), data (loading),
+                             rules (election rules), colors (party colors), components (party
+                             tags, totals bar, live lines), map (counties, districts, states,
+                             stripes, arrows), actions (map tools, years and races), hash
+                             (links), panel, cards, legend, tooltip, live, trail, places, views/
 web/js/us/views/             one view per kind of race (president; statewide: Senate and governors;
                              House), each with the same parts: map colors, click target, hover box,
                              legend, panel, Races and History cards, year-ribbon result, headline
-                             (views/index.js lists them). The rest of the page asks view(); a new
-                             office or country adds a view instead of more if-chains (November 12, 2026)
+                             (views/index.js lists them). The page asks view(); a new office adds
+                             a view, a new country its own folder (web/js/pl/ next)
 tools/serve.py                   the page on your computer, like Cloudflare serves it (port 8000)
 tools/check/check.sh             does the working tree draw what the last commit draws? 52 views
                                  and click sequences (check.html) recorded in headless Chromium,

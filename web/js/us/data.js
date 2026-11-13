@@ -1,7 +1,7 @@
 // Loading the data files, the elections each race has, map shapes and projection.
 import { site } from "../site.js";
-import { t } from "../texts.js";
 import { state } from "../state.js";
+import { failed } from "../components.js";
 
 export const W = 975, H = 610;
 const files = Promise.all([
@@ -13,12 +13,6 @@ const files = Promise.all([
   d3.json("/img/people/people.json").catch(() => ({})), // same script: Commons photos and their credits
 ]);
 export const [geo, data, photoList, partyIcons, congressList, peoplePhotos] = await files.catch(err => { failed(err); throw err; });
-// the page cannot work without its data: say how to open it
-export function failed(err) {
-  console.error(err);
-  document.getElementById("panel").innerHTML =
-    `<p class="empty">${t("noData")}</p>`;
-}
 export const congressPhotos = new Set(congressList);
 export const photos = new Set(photoList);
 

@@ -18,7 +18,8 @@
 //   roundRaces()    the races that may have had more rounds (November | Final)
 //   redrawOnSelect  whether picking a place recolors the map
 //   headline()      [page headline HTML, the line under it, the tab title]
-// A new office or country adds its own view; the rest of the page asks view().
+// A new office adds its own view; the rest of the page asks view() (web/js/country.js), which
+// asks the country's list (this one: usView).
 import { state } from "../../state.js";
 import { presidentView } from "./president.js";
 import { statewideView } from "./statewide.js";
@@ -26,5 +27,5 @@ import { houseView } from "./house.js";
 
 // looked up on each call: the view modules and the map import each other, so the objects may not
 // exist yet while the modules load
-export const view = (office = state.office) =>
+export const usView = (office = state.office) =>
   ({ president: presidentView, senate: statewideView, governor: statewideView, house: houseView })[office];

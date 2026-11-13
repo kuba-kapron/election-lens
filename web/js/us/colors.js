@@ -1,8 +1,8 @@
 // Colors read from the CSS, and the color of each place or race on the map.
-import { state } from "./state.js";
-import { stepOf } from "./format.js";
-import { counted, flippedFrom, isLive, margin, pickup, raceLean, record, runoffOf, seatParty, shift, shownRound, stateWinner } from "./us/rules.js";
-import { view } from "./us/views/index.js";
+import { state } from "../state.js";
+import { view } from "../country.js";
+import { stepOf } from "../format.js";
+import { counted, flippedFrom, isLive, margin, pickup, raceLean, record, runoffOf, seatParty, shift, shownRound, stateWinner } from "./rules.js";
 
 // colors (read from CSS so dark mode follows)
 export let colors;

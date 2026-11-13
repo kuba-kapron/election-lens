@@ -1,6 +1,6 @@
 // The light / dark switch.
 import { t } from "./texts.js";
-import { readColors } from "./colors.js";
+import { country } from "./country.js";
 import { render } from "./actions.js";
 
 // light / dark switch (starts from the system setting, then remembers the choice)
@@ -16,7 +16,7 @@ export function drawThemeButton() {
   themeBtn.setAttribute("aria-checked", String(dark));
   themeBtn.title = t(dark ? "toLight" : "toDark");
 }
-export function refreshColors() { readColors(); render({ map: true, panel: true }); drawThemeButton(); }
+export function refreshColors() { country.readColors(); render({ map: true, panel: true }); drawThemeButton(); }
 themeBtn.addEventListener("click", () => {
   const next = currentTheme() === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;

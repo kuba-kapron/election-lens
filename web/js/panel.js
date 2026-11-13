@@ -1,23 +1,16 @@
 // The results panel and the breadcrumb.
 import { t } from "./texts.js";
 import { state, ui } from "./state.js";
-import { data } from "./us/data.js";
-import { fmtInt } from "./format.js";
-import { SINGLE, atLarge, countyLean, isLive, isNewSeat, lean, pastMark, shownRound, stateOf } from "./us/rules.js";
-import { CAUCUS_NAME, COUNTRY, countyName, districtName, drawPhotoCredits, fitNames, flagBox, notesList, peopleRows, personRow } from "./components.js";
-import { drawLiveSources } from "./us/live.js";
+import { country, view } from "./country.js";
+import { fitNames } from "./components.js";
 import { filterList, historyCard, listView, racesCard } from "./cards.js";
-import { fillTrail } from "./us/trail.js";
-import { render, select, setYear } from "./actions.js";
-import { view } from "./us/views/index.js";
+import { render, select } from "./actions.js";
 
-// where the map is: "United States › Ohio › Franklin County"; each level above is a link
+// where the map is: "United States › Ohio › Franklin County" (the country lists the levels);
+// each level above is a link
 export const crumbsEl = document.getElementById("crumbs");
 export function drawCrumbs() {
-  const sel = state.sel, st = stateOf(sel), parts = [[{ type: "nation" }, `${flagBox()}${COUNTRY.name}`]];
-  if (st) parts.push([{ type: "state", id: st }, data.states[st].name]);
-  if (sel.type === "county" && !SINGLE.has(st)) parts.push([sel, countyName(sel.id)]);
-  if (sel.type === "district" && !atLarge(st)) parts.push([sel, `${districtName(sel.id, true)} district`]);
+  const parts = country.crumbs(state.sel);
   crumbsEl.innerHTML = parts.map(([, label], i) => i < parts.length - 1
     ? `<button type="button" class="quiet" data-crumb="${i}">${label}</button><span class="sep" aria-hidden="true">›</span>`
     : `<span aria-current="location">${label}</span>`).join("");
@@ -68,11 +61,11 @@ export function drawPanel() {
   }));
   historyEl.querySelectorAll("[data-hist]").forEach(b => b.addEventListener("click", () => {
     if (b.dataset.histSeat) state.seat = b.dataset.histSeat;
-    setYear(+b.dataset.hist);
+    country.setYear(+b.dataset.hist);
   }));
   splitPanel();
   fitNames();
-  drawPhotoCredits();
+  country.afterCards?.();
 }
 // the panel in two parts: the headline with the first numbers (totals bar, or the candidates
 // and their grey line), then the rest. One card on wide screens; on narrow ones CSS puts the
@@ -89,44 +82,15 @@ export function splitPanel() {
   rest.append(...kids.slice(end + 1));
   panel.replaceChildren(top, rest);
 }
-// the panel: the view's HTML (see views/), its seat tabs, and tonight the sources and race chart
+// the panel: the view's HTML (see its views/) and seat tabs, with the country's extra work before
+// and after (US tonight: the footer's sources, the race chart)
 export function drawPanelBody() {
-  if (isLive()) drawLiveSources();
+  country.beforePanel?.();
   panel.innerHTML = view().panel();
   bindSeatTabs();
-  if (isLive()) fillTrail();
+  country.afterPanel?.();
 }
 
-// a whole race: statewide (Senate) or district (House)
-export function raceBody(r) {
-  if (!r.rounds.length) {
-    return `<div class="cand">${personRow(r.cands[0], null, null, true)}</div>
-      <p class="note">Won unopposed${isNewSeat(r) ? " · New seat" : ""}</p>${notesList(r.notes)}`;
-  }
-  const last = r.rounds.length - 1;
-  const ri = shownRound(r);
-  const rd = r.rounds[ri], l = lean(r.cands, rd.votes, rd.total);
-  // grey lines, as tonight: what the numbers are, and whether the seat changed party
-  const facts = [rd.label, `${fmtInt(rd.total)} votes`];
-  if (isNewSeat(r)) facts.push("New seat");
-  if (ri !== last) facts.push(`decided in the ${r.rounds[last].kind === "runoff" ? "runoff" : "final round"}`);
-  const w = r.cands[0].caucus;
-  const flip = ri === last && r.held && r.held !== w
-    ? `<p class="note"><strong>Flipped</strong> · ${CAUCUS_NAME[w]} gained the seat from the ${CAUCUS_NAME[r.held]}</p>` : "";
-  // an earlier round: no winner yet; those in the next round advanced (→, bold)
-  const mark = pastMark(r);
-  return `<div class="cand">${peopleRows(r.cands, rd.votes, rd.total, rd.other, mark)}</div>
-    <p class="note">${facts.join(" · ")}</p>${flip}${notesList(r.notes)}`;
-}
-export function countyBody(r, fips) {
-  const v = r.counties?.[fips];
-  if (!v) return `<p class="empty">No county figures for this race.</p>${notesList(r.notes)}`;
-  const n = r.cands.length, l = countyLean(r, fips), cr = r.rounds[r.county_round];
-  let note = `County figures: ${cr.label}.`;
-  if (r.county_round !== r.rounds.length - 1) note += ` The seat was decided in the ${r.rounds[r.rounds.length - 1].kind === "runoff" ? "runoff" : "ranked-choice count"}, which has no county figures.`;
-  return `<div class="cand">${peopleRows(r.cands, v.slice(0, n), v[n + 1], v[n], l.lead)}</div>
-    <p class="note">${fmtInt(v[n + 1])} votes · ${note}</p>${notesList(r.notes)}`;
-}
 // a state with two races (regular and special Senate, or tonight's Senate and governor): its tabs
 export function chooseSeat(seat) {
   state.seat = seat;

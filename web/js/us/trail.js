@@ -3,7 +3,7 @@ import { site } from "../site.js";
 import { state } from "../state.js";
 import { liveFile, liveOffice } from "./data.js";
 import { clock, fmtInt, possessive } from "../format.js";
-import { candFill } from "../colors.js";
+import { candFill } from "./colors.js";
 import { svg, tip } from "../map.js";
 import { panel } from "../panel.js";
 

@@ -3,7 +3,8 @@ import { site } from "../site.js";
 import { state } from "../state.js";
 import { H, W, projection } from "./data.js";
 import { stateOf } from "./rules.js";
-import { gPlaces, sizeStripes, svg } from "../map.js";
+import { gPlaces, svg } from "../map.js";
+import { sizeStripes } from "./map.js";
 
 // Which cities get a name depends on the zoom: the largest metros for the whole country,
 // more as you zoom in. Largest first; a name that would overlap one already placed is left
