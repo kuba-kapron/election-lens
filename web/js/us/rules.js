@@ -1,5 +1,5 @@
 // Election rules: results, margins, rounds and runoffs, calls, pickups, seat totals.
-import { state } from "./state.js";
+import { state } from "../state.js";
 import { LIVE_YEAR, data, extra, houseHolder, liveFile, years } from "./data.js";
 
 export function record(sel, year) {

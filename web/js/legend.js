@@ -1,8 +1,8 @@
 // The legend under the map.
 import { state } from "./state.js";
-import { counted, heldBy, isLive, pickup, raceLean, runoffOf, seatParty } from "./rules.js";
+import { counted, heldBy, isLive, pickup, raceLean, runoffOf, seatParty } from "./us/rules.js";
 import { BINS, colors, congressCategorical, pastFill } from "./colors.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // the legend: each view says what its colors mean (see views/)
 export function drawLegend() {

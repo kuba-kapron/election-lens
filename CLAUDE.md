@@ -112,12 +112,13 @@ pipeline/                        run from the repository root: `uv run -m pipeli
 web/index.html, style.css    the page; plain JS + D3 v7, no build step
 web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
                              app.js on November 12, 2026): site (language and country from the
-                             address), texts (the page's texts per
-                             language, t("key")), state, data (loading), format, rules
-                             (election rules), colors, components (shared HTML pieces), map,
-                             places, tooltip, legend, nav (year ribbon), panel, live, cards,
-                             trail, finder, actions (render, select), theme, hash (links)
-web/js/views/                one view per kind of race (president; statewide: Senate and governors;
+                             address), texts (the page's texts per language, t("key")), state,
+                             format, colors, components (shared HTML pieces), map, tooltip,
+                             legend, nav (year ribbon), panel, cards, finder, actions (render,
+                             select), theme, hash (links)
+web/js/us/                   the US-only code (moved November 13, 2026): data (loading), rules
+                             (election rules), live, trail, places (city labels), and views/:
+web/js/us/views/             one view per kind of race (president; statewide: Senate and governors;
                              House), each with the same parts: map colors, click target, hover box,
                              legend, panel, Races and History cards, year-ribbon result, headline
                              (views/index.js lists them). The rest of the page asks view(); a new
@@ -260,7 +261,7 @@ Rules agreed with the owner:
   and nothing stops.
   Plus seats called by hand (solid) and leads (light). Control: 51, or 50 for Republicans
   (Vice President Vance breaks ties). One rule for every year (decided November 12, 2026,
-  `tieBreaker()` in web/js/rules.js): a 50–50 Senate goes to the Vice President's party, taken from the
+  `tieBreaker()` in web/js/us/rules.js): a 50–50 Senate goes to the Vice President's party, taken from the
   presidential results: the sitting VP in a midterm, the incoming one in a presidential year
   (undecided at 50–50 until that race is decided). The panel's majority mark counts certain
   seats only; the ribbon and the History card count leads too ("so far").
@@ -303,7 +304,7 @@ Rules agreed with the owner:
   numbers and time. X axis: votes counted, not the clock (decided November 6, 2026): US sources'
   "% counted" differ in meaning (precincts, polling places, civicAPI's expected vote), can go
   backwards and sit at 100% while mail is counted. For a country with one national source the
-  share counted can be the axis (TRAIL_X = "pct" in web/js/trail.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
+  share counted can be the axis (TRAIL_X = "pct" in web/js/us/trail.js). --replay charts its test data, marked; a real run rebuilds the files from snapshots.
 - Public copy: Cloudflare Pages (project election-lens), `pipeline/publish.sh --loop` uploads
   web/ every 150 s (about 200 of the free plan's 500 uploads a month per night); the importer
   runs separately. Page changes reach it only through that upload.

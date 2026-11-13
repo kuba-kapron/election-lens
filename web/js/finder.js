@@ -1,6 +1,6 @@
 // The state finder (type to narrow the list).
 import { state } from "./state.js";
-import { data } from "./data.js";
+import { data } from "./us/data.js";
 import { select } from "./actions.js";
 
 // state finder: type to narrow the list (combobox)

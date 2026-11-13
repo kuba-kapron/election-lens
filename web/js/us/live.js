@@ -1,7 +1,7 @@
 // The panel on election night.
-import { fmtInt } from "./format.js";
+import { fmtInt } from "../format.js";
 import { counted, isCalled, isNewSeat, liveRaces, raceLean, roundOf, runoffOf } from "./rules.js";
-import { liveSource, liveStatus, pctShort, peopleRows, personRow, pickupText } from "./components.js";
+import { liveSource, liveStatus, pctShort, peopleRows, personRow, pickupText } from "../components.js";
 
 export function liveRaceBody(r, id = r.id) {
   let html = r.test ? `<p class="test-flag">Test data, not real results</p>` : "";

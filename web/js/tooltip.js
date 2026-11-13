@@ -1,11 +1,11 @@
 // The hover box over the map.
-import { path, stateById } from "./data.js";
+import { path, stateById } from "./us/data.js";
 import { WIN_MARK, advancedMark, pct } from "./format.js";
-import { counted, isCalled, raceLean, roundOf } from "./rules.js";
+import { counted, isCalled, raceLean, roundOf } from "./us/rules.js";
 import { candFill } from "./colors.js";
 import { leanLabel, liveStatus, partyTag } from "./components.js";
 import { clickTarget, hoverPath, lastPointer, tip, wrap } from "./map.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // the hover box: the shape's outline when it picks a whole state, and what the view says about it
 export function showTip(e, f) {

@@ -1,15 +1,15 @@
 // The results panel and the breadcrumb.
 import { t } from "./texts.js";
 import { state, ui } from "./state.js";
-import { data } from "./data.js";
+import { data } from "./us/data.js";
 import { fmtInt } from "./format.js";
-import { SINGLE, atLarge, countyLean, isLive, isNewSeat, lean, pastMark, shownRound, stateOf } from "./rules.js";
+import { SINGLE, atLarge, countyLean, isLive, isNewSeat, lean, pastMark, shownRound, stateOf } from "./us/rules.js";
 import { CAUCUS_NAME, COUNTRY, countyName, districtName, drawPhotoCredits, fitNames, flagBox, notesList, peopleRows, personRow } from "./components.js";
-import { drawLiveSources } from "./live.js";
+import { drawLiveSources } from "./us/live.js";
 import { filterList, historyCard, listView, racesCard } from "./cards.js";
-import { fillTrail } from "./trail.js";
+import { fillTrail } from "./us/trail.js";
 import { render, select, setYear } from "./actions.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // where the map is: "United States › Ohio › Franklin County"; each level above is a link
 export const crumbsEl = document.getElementById("crumbs");

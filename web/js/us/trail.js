@@ -1,11 +1,11 @@
 // The race through the night chart.
-import { site } from "./site.js";
-import { state } from "./state.js";
+import { site } from "../site.js";
+import { state } from "../state.js";
 import { liveFile, liveOffice } from "./data.js";
-import { clock, fmtInt, possessive } from "./format.js";
-import { candFill } from "./colors.js";
-import { svg, tip } from "./map.js";
-import { panel } from "./panel.js";
+import { clock, fmtInt, possessive } from "../format.js";
+import { candFill } from "../colors.js";
+import { svg, tip } from "../map.js";
+import { panel } from "../panel.js";
 
 // the race through the night (web/data/us/live/trail-<office>.json)
 // Loaded only when a race panel is open, and again only when the office file says the chart

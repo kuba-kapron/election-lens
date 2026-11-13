@@ -1,10 +1,10 @@
 // The year ribbon and the country menu.
 import { state } from "./state.js";
-import { LIVE_YEAR, curYears } from "./data.js";
+import { LIVE_YEAR, curYears } from "./us/data.js";
 import { ckey, colors } from "./colors.js";
 import { liveTag } from "./components.js";
 import { setYear } from "./actions.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // One row of the race's years, scrolling sideways when they do not fit. Under each year a thin
 // bar in the winner's color (the Electoral College winner; the Senate or House majority);

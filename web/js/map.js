@@ -1,13 +1,13 @@
 // The map: shapes, zoom, selection, arrows and badges.
 import { state } from "./state.js";
-import { H, W, counties, ct2023, nationOutline, path, shapeById, stateById, stateMesh, states } from "./data.js";
-import { SINGLE, atLarge, districtShape, shift, stateOf } from "./rules.js";
+import { H, W, counties, ct2023, nationOutline, path, shapeById, stateById, stateMesh, states } from "./us/data.js";
+import { SINGLE, atLarge, districtShape, shift, stateOf } from "./us/rules.js";
 import { colors } from "./colors.js";
-import { drawPlaces, placeScale } from "./places.js";
+import { drawPlaces, placeScale } from "./us/places.js";
 import { showTip } from "./tooltip.js";
 import { drawLegend } from "./legend.js";
 import { select } from "./actions.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // the county shapes of a year's map (each view picks: see views/)
 export const visibleShapes = y => view().countyShapes(y);

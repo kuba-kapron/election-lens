@@ -1,12 +1,12 @@
 // The Races and History cards under the map.
 import { t } from "./texts.js";
 import { state, ui } from "./state.js";
-import { LIVE_YEAR, data } from "./data.js";
+import { LIVE_YEAR, data } from "./us/data.js";
 import { ARROW, CHECK, attr, fold, markSpan } from "./format.js";
-import { advancedOf, atLarge, counted, countyLean, isCalled, isClosed, isLive, lean, margin, raceLean, roundOf, runoffOf, signedMargin, stateOf } from "./rules.js";
+import { advancedOf, atLarge, counted, countyLean, isCalled, isClosed, isLive, lean, margin, raceLean, roundOf, runoffOf, signedMargin, stateOf } from "./us/rules.js";
 import { barChart, leanLabel, liveStatus, mlabel, pctText, personCell, raceRow, runoffText } from "./components.js";
 import { racesEl } from "./panel.js";
-import { view } from "./views/index.js";
+import { view } from "./us/views/index.js";
 
 // tonight: who is shown (the called winner, else the leader) and the status column
 export function liveRowParts(r) {

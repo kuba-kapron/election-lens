@@ -19,7 +19,7 @@
 //   redrawOnSelect  whether picking a place recolors the map
 //   headline()      [page headline HTML, the line under it, the tab title]
 // A new office or country adds its own view; the rest of the page asks view().
-import { state } from "../state.js";
+import { state } from "../../state.js";
 import { presidentView } from "./president.js";
 import { statewideView } from "./statewide.js";
 import { houseView } from "./house.js";

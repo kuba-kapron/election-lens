@@ -1,17 +1,17 @@
 // Statewide races, Senate and governors: states colored by the race, counties by its county
 // figures; past years and tonight.
-import { state } from "../state.js";
+import { state } from "../../state.js";
 import { LIVE_YEAR, counties, data, extra, liveFile, path, stateById } from "../data.js";
-import { possessive } from "../format.js";
+import { possessive } from "../../format.js";
 import { SINGLE, byStateSeat, countyLean, isLive, lean, liveHouseTally, liveRaces, pastGains, pastMark, raceLean, roundOf, sYear, senateBalance, senateControl, senatePopular, senateRace, senateRaces, senateSecured, stateOf, tieBreaker } from "../rules.js";
-import { colors, leanColor, raceFill } from "../colors.js";
-import { CAUCUS_NAME, SENATE_POP_NOTE, countyName, flipLine, headline, leanLabel, liveWhen, personCell, placeName, popSection, raceRow, seatLabel, seatSpan, senateNeed, tugBar, wonLeadParts } from "../components.js";
-import { badgeMarks, countyPaths, countyTarget, statePaths } from "../map.js";
-import { liveTip, raceTip } from "../tooltip.js";
-import { flipNote, raceLegend } from "../legend.js";
-import { countyBody, raceBody } from "../panel.js";
+import { colors, leanColor, raceFill } from "../../colors.js";
+import { CAUCUS_NAME, SENATE_POP_NOTE, countyName, flipLine, headline, leanLabel, liveWhen, personCell, placeName, popSection, raceRow, seatLabel, seatSpan, senateNeed, tugBar, wonLeadParts } from "../../components.js";
+import { badgeMarks, countyPaths, countyTarget, statePaths } from "../../map.js";
+import { liveTip, raceTip } from "../../tooltip.js";
+import { flipNote, raceLegend } from "../../legend.js";
+import { countyBody, raceBody } from "../../panel.js";
 import { liveCountyBody, liveRaceBody } from "../live.js";
-import { byName, countyItem, marginBar, popBar, raceItem, seatBar, withLive } from "../cards.js";
+import { byName, countyItem, marginBar, popBar, raceItem, seatBar, withLive } from "../../cards.js";
 
 export const statewideView = {
   districts: false,

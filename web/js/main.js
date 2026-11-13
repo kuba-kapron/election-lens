@@ -1,13 +1,13 @@
 // Start-up: read the link, load the data, draw the page.
 import "./site.js";  // first: the page's address (language and country)
+import { applyTexts } from "./texts.js";
 import { state } from "./state.js";
-import { LIVE_YEAR, curYears, ensureData, failed, liveFile, loadLive } from "./data.js";
-import { isLive } from "./rules.js";
-import { initPlaces } from "./places.js";
+import { LIVE_YEAR, curYears, ensureData, failed, liveFile, loadLive } from "./us/data.js";
+import { isLive } from "./us/rules.js";
+import { initPlaces } from "./us/places.js";
 import { render, select, setCmap, setLevel, setMode, setOffice, setYear } from "./actions.js";
 import { readHash } from "./hash.js";
 import "./theme.js";  // the light / dark switch
-import { applyTexts } from "./texts.js";
 
 applyTexts();  // the page frame in the page's language
 try {

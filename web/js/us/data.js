@@ -1,7 +1,7 @@
 // Loading the data files, the elections each race has, map shapes and projection.
-import { t } from "./texts.js";
-import { site } from "./site.js";
-import { state } from "./state.js";
+import { site } from "../site.js";
+import { t } from "../texts.js";
+import { state } from "../state.js";
 
 export const W = 975, H = 610;
 const files = Promise.all([

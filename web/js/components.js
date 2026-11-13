@@ -1,8 +1,8 @@
 // HTML pieces shared by the panel and the cards: names, candidate rows, totals bars.
 import { state } from "./state.js";
-import { congressPhotos, data, extra, liveFile, partyIcons, peoplePhotos, photos } from "./data.js";
+import { congressPhotos, data, extra, liveFile, partyIcons, peoplePhotos, photos } from "./us/data.js";
 import { WIN_MARK, advancedMark, attr, clock, fmtInt, ordinal, pct, points, possessive } from "./format.js";
-import { advancedOf, counted, gains, isCalled, isClosed, isLive, isNewSeat, lean, pickup, runoffOf } from "./rules.js";
+import { advancedOf, counted, gains, isCalled, isClosed, isLive, isNewSeat, lean, pickup, runoffOf } from "./us/rules.js";
 import { candFill, ckey, colors } from "./colors.js";
 
 export const countyName = id => data.counties[id]?.name ?? "Unknown";
