@@ -100,6 +100,14 @@ pipeline/                        run from the repository root: `uv run -m pipeli
   us/photos/fetch_portraits.py   official portraits of candidates who served -> photos/congress/
   us/photos/find_commons_photos.py  Wikimedia Commons photos for US candidates: review sheet (see Live)
   us/live/                       election night, see "Live results" below
+  pl/                            Poland (started November 13, 2026)
+  pl/fetch_prg.sh <year>         borders as of that year (Państwowy Rejestr Granic, GUGiK, free for
+                                 any use; ~380 MB) -> data/raw/pl/prg/<year>/
+  pl/build_geo.sh <year>         -> web/data/pl/geo-<year>.json: gminas (Warsaw as its 18 districts,
+                                 as PKW reports it), powiats, voivodeships; ids = PKW's TERYT codes
+  pl/president/fetch_data.sh     PKW's 2025 files (stations, both rounds) -> data/raw/pl/president/2025/
+  pl/president/build_results.py  -> web/data/pl/president.json: both rounds by gmina, powiat,
+                                 voivodeship, country; checked against PKW's gmina table and totals
   publish.sh                     upload web/ to Cloudflare Pages (wrangler in package.json; --loop)
 web/index.html, style.css    the page; plain JS + D3 v7, no build step
 web/js/                      the page's code as ES modules, loaded by js/main.js (split from one
@@ -338,5 +346,15 @@ byte-for-byte unchanged. Poland goes in pipeline/pl/. web/data/ has one folder p
 since November 13, 2026 (web/data/us/, later web/data/pl/; the page picks it from the address, see
 COUNTRIES in web/js/site.js); web/img/ is still shared.
 
+Poland, 2025 presidential election (data built November 13, 2026; page view next):
+- Results: PKW's polling-station counts (32,143 per round) summed to gmina, powiat and
+  voivodeship; national totals are PKW's official candidate totals. Three military stations abroad
+  (Irbil, Baghdad, At Tiri) have no figures in the station files: their votes are in the national
+  totals only (the build checks the gap stays tiny). Abroad and ships: national total only.
+- Borders: PRG's 2025 archive (the state at the end of 2025: legal borders as of January 1, 2025,
+  with survey corrections; the six towns of 2026 are not in it). Warsaw from PRG's registry units.
+- Obwód (polling station) map: no official borders exist; Kraków publishes its own. Maybe later,
+  drawn from PKW's border descriptions and PRG address points (a separate project). No dots map.
+
 Later: certified 2026 results, Senate/House before 2020, Alaska by house district, Poland
-(PKW results down to gmina, live for the 2027 parliamentary election), more countries.
+(the page view; live for the 2027 parliamentary election), more countries.

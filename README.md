@@ -28,6 +28,15 @@ The processed data in `web/data/` (one folder per country: `web/data/us/`) is co
 uv run -m pipeline.us.president.build_results  # results -> web/data/us/results.json
 ```
 
+Poland, 2025 presidential election (both rounds; PKW results, borders from the national boundary register, about 380 MB download):
+
+```
+./pipeline/pl/fetch_prg.sh 2025                # borders as of 2025 -> data/raw/pl/prg/2025/
+./pipeline/pl/build_geo.sh 2025                # gminas, powiats, voivodeships -> web/data/pl/geo-2025.json
+./pipeline/pl/president/fetch_data.sh          # PKW's result files -> data/raw/pl/president/2025/
+uv run -m pipeline.pl.president.build_results  # -> web/data/pl/president.json
+```
+
 Senate and House (needs mapshaper too; one file needs a manual download, see the script):
 
 ```
